@@ -2,7 +2,6 @@ import path from "path";
 import fs from "fs";
 
 const SQLITE_PATH = path.join(process.cwd(), "data", "astro_planet_data.sqlite");
-const SUMMARY_PATH = path.join(process.cwd(), "data", "astro_data_summary.json");
 
 type SQLiteDB = import("better-sqlite3").Database;
 let db: SQLiteDB | null = null;
@@ -18,11 +17,6 @@ function getDb(): SQLiteDB {
 
 export function isDataReady(): boolean {
   return fs.existsSync(SQLITE_PATH);
-}
-
-export function getDataSummary(): Record<string, unknown> | null {
-  if (!fs.existsSync(SUMMARY_PATH)) return null;
-  return JSON.parse(fs.readFileSync(SUMMARY_PATH, "utf-8"));
 }
 
 function querySync(sql: string, params: unknown[] = []): Record<string, unknown>[] {
@@ -41,6 +35,7 @@ function query(sql: string, params: unknown[] = []): Promise<Record<string, unkn
 }
 
 // ─── Astrology Query Functions ────────────────────────────────────────────────
+// Schema: date, planet, sign, nakshatra, pada, tithi, paksha, lagna
 
 export async function getPlanetaryPositions(params: {
   planets?: string[];
@@ -53,7 +48,8 @@ export async function getPlanetaryPositions(params: {
   if (planets && planets.length > 0) {
     const placeholders = planets.map(() => "?").join(", ");
     const sql = `
-      SELECT * FROM astro_planet_data
+      SELECT date, planet, sign, nakshatra, pada, tithi, paksha, lagna
+      FROM astro_planet_data
       WHERE date >= ? AND date <= ?
         AND lower(planet) IN (${placeholders})
       ORDER BY date ASC
@@ -63,7 +59,8 @@ export async function getPlanetaryPositions(params: {
   }
 
   const sql = `
-    SELECT * FROM astro_planet_data
+    SELECT date, planet, sign, nakshatra, pada, tithi, paksha, lagna
+    FROM astro_planet_data
     WHERE date >= ? AND date <= ?
     ORDER BY date ASC
     LIMIT ?
@@ -79,29 +76,14 @@ export async function getPlanetInSign(params: {
 }): Promise<Record<string, unknown>[]> {
   const { planet, sign, startDate = "1990-01-01", endDate = "2031-12-31" } = params;
   const sql = `
-    SELECT * FROM astro_planet_data
+    SELECT date, planet, sign, nakshatra, pada, tithi, paksha, lagna
+    FROM astro_planet_data
     WHERE lower(planet) = ?
       AND lower(sign) = ?
       AND date >= ? AND date <= ?
     ORDER BY date ASC
   `;
   return query(sql, [planet.toLowerCase(), sign.toLowerCase(), startDate, endDate]);
-}
-
-export async function getRetrogradePeriods(params: {
-  planet: string;
-  startDate?: string;
-  endDate?: string;
-}): Promise<Record<string, unknown>[]> {
-  const { planet, startDate = "1990-01-01", endDate = "2031-12-31" } = params;
-  const sql = `
-    SELECT * FROM astro_planet_data
-    WHERE lower(planet) = ?
-      AND (is_retrograde = 1 OR lower(cast(is_retrograde as text)) = 'true')
-      AND date >= ? AND date <= ?
-    ORDER BY date ASC
-  `;
-  return query(sql, [planet.toLowerCase(), startDate, endDate]);
 }
 
 export async function getPlanetaryTransits(params: {
@@ -115,13 +97,13 @@ export async function getPlanetaryTransits(params: {
     const placeholders = planets.map(() => "?").join(", ");
     const sql = `
       WITH ranked AS (
-        SELECT *,
+        SELECT date, planet, sign, nakshatra, pada,
           LAG(sign) OVER (PARTITION BY planet ORDER BY date) AS prev_sign
         FROM astro_planet_data
         WHERE date >= ? AND date <= ?
           AND lower(planet) IN (${placeholders})
       )
-      SELECT planet, date, sign, prev_sign
+      SELECT planet, date, sign, nakshatra, pada, prev_sign
       FROM ranked
       WHERE sign != prev_sign AND prev_sign IS NOT NULL
       ORDER BY date ASC
@@ -131,24 +113,15 @@ export async function getPlanetaryTransits(params: {
 
   const sql = `
     WITH ranked AS (
-      SELECT *,
+      SELECT date, planet, sign, nakshatra, pada,
         LAG(sign) OVER (PARTITION BY planet ORDER BY date) AS prev_sign
       FROM astro_planet_data
       WHERE date >= ? AND date <= ?
     )
-    SELECT planet, date, sign, prev_sign
+    SELECT planet, date, sign, nakshatra, pada, prev_sign
     FROM ranked
     WHERE sign != prev_sign AND prev_sign IS NOT NULL
     ORDER BY date ASC
   `;
   return query(sql, [startDate, endDate]);
-}
-
-export async function runCustomQuery(sql: string): Promise<Record<string, unknown>[]> {
-  const trimmed = sql.trim().toUpperCase();
-  if (!trimmed.startsWith("SELECT")) {
-    throw new Error("Only SELECT queries are allowed.");
-  }
-  const finalSql = sql.replace(/\bastro_data\b/gi, "astro_planet_data");
-  return query(finalSql);
 }

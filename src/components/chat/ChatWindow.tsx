@@ -1,9 +1,8 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { ChatThread, ChatMessage, ToolCallRecord } from "@/types";
+import { ChatThread, ChatMessage } from "@/types";
 import { formatDateTime } from "@/lib/utils";
-import ToolCallBadge from "./ToolCallBadge";
 
 interface ChatWindowProps {
   thread: ChatThread;
@@ -14,7 +13,6 @@ interface ChatWindowProps {
 
 interface StreamingState {
   text: string;
-  activeTool: string | null;
 }
 
 export default function ChatWindow({
@@ -66,7 +64,7 @@ export default function ChatWindow({
       createdAt: new Date(),
     };
     setMessages((prev) => [...prev, userMsg]);
-    setStreaming({ text: "", activeTool: null });
+    setStreaming({ text: "" });
 
     try {
       const res = await fetch("/api/chat", {
@@ -80,7 +78,6 @@ export default function ChatWindow({
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
-      const toolCalls: ToolCallRecord[] = [];
       let fullText = "";
 
       while (true) {
@@ -96,14 +93,7 @@ export default function ChatWindow({
           const raw = line.slice(6);
           if (!raw.trim()) continue;
 
-          let chunk: {
-            type: string;
-            content?: string;
-            toolName?: string;
-            toolInput?: Record<string, unknown>;
-            toolOutput?: string;
-            error?: string;
-          };
+          let chunk: { type: string; content?: string; error?: string };
           try {
             chunk = JSON.parse(raw);
           } catch {
@@ -112,23 +102,13 @@ export default function ChatWindow({
 
           if (chunk.type === "text" && chunk.content) {
             fullText += chunk.content;
-            setStreaming((s) => ({ text: (s?.text ?? "") + chunk.content!, activeTool: s?.activeTool ?? null }));
-          } else if (chunk.type === "tool_start") {
-            setStreaming((s) => ({ text: s?.text ?? "", activeTool: chunk.toolName ?? null }));
-          } else if (chunk.type === "tool_end") {
-            toolCalls.push({
-              toolName: chunk.toolName!,
-              input: chunk.toolInput ?? {},
-              output: chunk.toolOutput ?? "",
-            });
-            setStreaming((s) => ({ text: s?.text ?? "", activeTool: null }));
+            setStreaming((s) => ({ text: (s?.text ?? "") + chunk.content! }));
           } else if (chunk.type === "done") {
             const assistantMsg: ChatMessage = {
               id: `temp-assistant-${Date.now()}`,
               threadId: thread.id,
               role: "assistant",
               content: fullText,
-              toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
               createdAt: new Date(),
             };
             setMessages((prev) => [...prev, assistantMsg]);
@@ -199,19 +179,6 @@ export default function ChatWindow({
         {/* Streaming assistant message */}
         {streaming !== null && (
           <div className="flex flex-col gap-2 max-w-3xl">
-            {streaming.activeTool && (
-              <div
-                className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs w-fit"
-                style={{
-                  background: "var(--bg-card)",
-                  border: "1px solid var(--border-subtle)",
-                  color: "var(--purple-light)",
-                }}
-              >
-                <span className="animate-spin">⟳</span>
-                <span>Querying {streaming.activeTool}...</span>
-              </div>
-            )}
             {streaming.text && (
               <div
                 className="px-4 py-3 rounded-2xl rounded-tl-sm text-sm leading-relaxed"
@@ -292,15 +259,6 @@ function MessageBubble({ message }: { message: ChatMessage }) {
 
   return (
     <div className={`flex flex-col gap-1 ${isUser ? "items-end" : "items-start"} max-w-3xl ${isUser ? "ml-auto" : ""}`}>
-      {/* Tool calls (assistant only) */}
-      {!isUser && message.toolCalls && message.toolCalls.length > 0 && (
-        <div className="flex flex-wrap gap-1 mb-1">
-          {message.toolCalls.map((tc, i) => (
-            <ToolCallBadge key={i} toolCall={tc} />
-          ))}
-        </div>
-      )}
-
       <div
         className="px-4 py-3 rounded-2xl text-sm leading-relaxed"
         style={{
