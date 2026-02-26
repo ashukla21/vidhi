@@ -3,6 +3,10 @@
 Download the vedastro-org/Astro_Planet_Data dataset from HuggingFace
 and store it in a local SQLite database for fast querying via better-sqlite3.
 
+Uses huggingface_hub to fetch raw CSV files directly, bypassing the datasets
+library's strict schema validation (which fails on mixed-type columns like
+time strings stored in numeric columns).
+
 Usage:
   python3 scripts/download_astro_data.py
 
@@ -13,6 +17,7 @@ Output:
 
 import json
 import sys
+import glob
 import sqlite3
 import pandas as pd
 from pathlib import Path
@@ -25,52 +30,123 @@ DATASET_NAME = "vedastro-org/Astro_Planet_Data"
 TABLE_NAME = "astro_planet_data"
 
 
-def download_dataset() -> pd.DataFrame:
-    print(f"Downloading {DATASET_NAME} from HuggingFace...")
+def download_raw_csvs() -> pd.DataFrame:
+    """
+    Download all CSV files from the HuggingFace dataset repo directly,
+    bypassing the datasets library's type-casting step that fails when
+    columns declared as 'double' contain time strings like '22:39'.
+    """
     try:
-        from datasets import load_dataset
+        from huggingface_hub import snapshot_download
     except ImportError:
-        print("ERROR: 'datasets' package not found. Run: pip install datasets")
+        print("ERROR: 'huggingface_hub' not found. Run: pip install huggingface-hub")
         sys.exit(1)
 
-    dataset = load_dataset(DATASET_NAME, trust_remote_code=True)
-    print(f"Available splits: {list(dataset.keys())}")
+    print(f"Downloading raw files from {DATASET_NAME}...")
+    print("(This may take a few minutes — ~500 CSV files, ~300 MB)")
+
+    local_dir = snapshot_download(
+        repo_id=DATASET_NAME,
+        repo_type="dataset",
+        ignore_patterns=["*.arrow", "*.parquet", "*.json", "*.md", "*.py", "*.lock"],
+    )
+    print(f"Files downloaded to: {local_dir}")
+
+    csv_files = sorted(glob.glob(f"{local_dir}/**/*.csv", recursive=True))
+    if not csv_files:
+        # Fallback: grab everything
+        csv_files = sorted(glob.glob(f"{local_dir}/**/*", recursive=True))
+        csv_files = [f for f in csv_files if Path(f).suffix.lower() == ".csv"]
+
+    if not csv_files:
+        print(f"ERROR: No CSV files found in {local_dir}")
+        print(f"Contents: {list(Path(local_dir).iterdir())[:20]}")
+        sys.exit(1)
+
+    print(f"Found {len(csv_files)} CSV files. Reading...")
 
     dfs = []
-    for split_name, split_data in dataset.items():
-        df = split_data.to_pandas()
-        df["_split"] = split_name
-        dfs.append(df)
-        print(f"  Split '{split_name}': {len(df):,} rows, columns: {list(df.columns)}")
+    errors = 0
+    for i, csv_path in enumerate(csv_files):
+        try:
+            # Read everything as strings first to avoid type inference failures
+            df = pd.read_csv(csv_path, dtype=str, on_bad_lines="skip")
+            if not df.empty:
+                dfs.append(df)
+        except Exception as e:
+            errors += 1
+            if errors <= 5:
+                print(f"  Warning: skipping {Path(csv_path).name}: {e}")
 
+        if (i + 1) % 50 == 0:
+            print(f"  Read {i + 1}/{len(csv_files)} files...")
+
+    if not dfs:
+        print("ERROR: No data loaded from any CSV file.")
+        sys.exit(1)
+
+    print(f"Combining {len(dfs)} files ({errors} skipped due to errors)...")
     full_df = pd.concat(dfs, ignore_index=True)
-    print(f"Total rows: {len(full_df):,}")
+    print(f"Total rows before dedup: {len(full_df):,}")
+
+    # Drop fully duplicate rows
+    full_df = full_df.drop_duplicates()
+    print(f"Total rows after dedup:  {len(full_df):,}")
     return full_df
 
 
 def normalize_dataframe(df: pd.DataFrame) -> pd.DataFrame:
-    """Normalize column names for consistent querying."""
+    """
+    Normalize column names and clean up values.
+    All columns arrive as strings; we selectively parse what we need.
+    """
+    # Normalize column names
     df.columns = [c.lower().strip().replace(" ", "_") for c in df.columns]
+    print(f"Columns: {list(df.columns)}")
 
-    # Parse date columns to YYYY-MM-DD strings
+    # Parse date column to YYYY-MM-DD
+    date_col = None
     for col in df.columns:
-        if "date" in col or "time" in col:
-            try:
-                df[col] = pd.to_datetime(df[col], errors="coerce").dt.strftime("%Y-%m-%d")
-            except Exception:
-                pass
+        if col == "date" or col.endswith("_date"):
+            date_col = col
+            break
+    # Broader fallback
+    if date_col is None:
+        candidates = [c for c in df.columns if "date" in c]
+        if candidates:
+            date_col = candidates[0]
 
-    # Normalize boolean retrograde column if present
+    if date_col:
+        parsed = pd.to_datetime(df[date_col], errors="coerce")
+        valid_mask = parsed.notna()
+        if valid_mask.sum() > 0:
+            df[date_col] = parsed.dt.strftime("%Y-%m-%d")
+            df = df[valid_mask].copy()
+            print(f"Parsed date column '{date_col}': {valid_mask.sum():,} valid rows")
+        else:
+            print(f"Warning: could not parse any dates from column '{date_col}'")
+
+    # Normalize retrograde boolean
     for col in ["is_retrograde", "retrograde"]:
         if col in df.columns:
             df[col] = (
                 df[col]
-                .astype(str)
                 .str.lower()
-                .map({"true": 1, "false": 0, "1": 1, "0": 0, "yes": 1, "no": 0})
-                .fillna(0)
-                .astype(int)
+                .str.strip()
+                .map({"true": "1", "false": "0", "1": "1", "0": "0",
+                      "yes": "1", "no": "0", "r": "1", "": "0"})
+                .fillna("0")
             )
+
+    # Normalize planet/sign to title-case
+    for col in ["planet", "sign"]:
+        if col in df.columns:
+            df[col] = df[col].str.strip().str.title()
+
+    # Strip whitespace from all remaining string columns
+    for col in df.columns:
+        if df[col].dtype == object:
+            df[col] = df[col].str.strip()
 
     return df
 
@@ -83,7 +159,6 @@ def save_to_sqlite(df: pd.DataFrame):
 
     df.to_sql(TABLE_NAME, conn, if_exists="replace", index=False, chunksize=10000)
 
-    # Create indexes for common query patterns
     print("Creating indexes...")
     cursor = conn.cursor()
     for col in ["date", "planet", "sign"]:
@@ -144,6 +219,8 @@ def save_summary(df: pd.DataFrame):
         print(f"  Date range  : {summary['date_min']} -> {summary['date_max']}")
     if "unique_planets" in summary:
         print(f"  Planets     : {summary['unique_planets']}")
+    if "unique_signs" in summary:
+        print(f"  Signs       : {summary['unique_signs']}")
 
 
 def main():
@@ -153,7 +230,7 @@ def main():
         print("Delete it and re-run to re-download.")
         return
 
-    df = download_dataset()
+    df = download_raw_csvs()
     df = normalize_dataframe(df)
     save_to_sqlite(df)
     save_summary(df)
