@@ -10,6 +10,7 @@ export default function Home() {
   const [threads, setThreads] = useState<ChatThread[]>([]);
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [pendingMessage, setPendingMessage] = useState<string | null>(null);
 
   useEffect(() => {
     loadSidebarData();
@@ -26,16 +27,26 @@ export default function Home() {
     setThreads(threadsData);
   }
 
-  async function createThread(folderId?: string) {
-    const res = await fetch("/api/threads", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ folderId }),
-    });
-    const thread: ChatThread = await res.json();
-    setThreads((prev) => [thread, ...prev]);
-    setActiveThreadId(thread.id);
-    return thread;
+  async function createThread(folderId?: string): Promise<ChatThread | null> {
+    try {
+      const res = await fetch("/api/threads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ folderId }),
+      });
+      if (!res.ok) {
+        const err = await res.text();
+        console.error("Failed to create thread:", res.status, err);
+        return null;
+      }
+      const thread: ChatThread = await res.json();
+      setThreads((prev) => [thread, ...prev]);
+      setActiveThreadId(thread.id);
+      return thread;
+    } catch (err) {
+      console.error("Failed to create thread:", err);
+      return null;
+    }
   }
 
   async function createFolder(name: string) {
@@ -103,7 +114,10 @@ export default function Home() {
       >
         {activeThread ? (
           <ChatWindow
+            key={activeThread.id}
             thread={activeThread}
+            initialMessage={pendingMessage}
+            onMessageSent={() => setPendingMessage(null)}
             onThreadUpdate={(updated) =>
               setThreads((prev) =>
                 prev.map((t) => (t.id === updated.id ? updated : t))
@@ -111,14 +125,21 @@ export default function Home() {
             }
           />
         ) : (
-          <WelcomeScreen onNewChat={() => createThread()} />
+          <WelcomeScreen
+            onNewChat={async (suggestion?: string) => {
+              const thread = await createThread();
+              if (thread && suggestion) {
+                setPendingMessage(suggestion);
+              }
+            }}
+          />
         )}
       </main>
     </div>
   );
 }
 
-function WelcomeScreen({ onNewChat }: { onNewChat: () => void }) {
+function WelcomeScreen({ onNewChat }: { onNewChat: (suggestion?: string) => void }) {
   const suggestions = [
     "What does Jupiter in Taurus mean for Bitcoin in 2025?",
     "Analyze Saturn retrograde periods and crypto market corrections",
@@ -157,7 +178,7 @@ function WelcomeScreen({ onNewChat }: { onNewChat: () => void }) {
         {suggestions.map((s, i) => (
           <button
             key={i}
-            onClick={onNewChat}
+            onClick={() => onNewChat(s)}
             className="text-left p-4 rounded-xl text-sm transition-all duration-150"
             style={{
               background: "var(--bg-card)",
@@ -181,7 +202,7 @@ function WelcomeScreen({ onNewChat }: { onNewChat: () => void }) {
       </div>
 
       <button
-        onClick={onNewChat}
+        onClick={() => onNewChat()}
         className="px-8 py-3 rounded-full font-semibold text-white transition-all duration-150 glow-purple"
         style={{ background: "var(--purple-primary)" }}
         onMouseEnter={(e) => {

@@ -7,6 +7,8 @@ import ToolCallBadge from "./ToolCallBadge";
 
 interface ChatWindowProps {
   thread: ChatThread;
+  initialMessage?: string | null;
+  onMessageSent?: () => void;
   onThreadUpdate: (thread: ChatThread) => void;
 }
 
@@ -15,27 +17,45 @@ interface StreamingState {
   activeTool: string | null;
 }
 
-export default function ChatWindow({ thread, onThreadUpdate }: ChatWindowProps) {
+export default function ChatWindow({
+  thread,
+  initialMessage,
+  onMessageSent,
+  onThreadUpdate,
+}: ChatWindowProps) {
   const [messages, setMessages] = useState<ChatMessage[]>(thread.messages ?? []);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState<StreamingState | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  // Track whether we've already fired the initialMessage so we don't send it twice
+  const initialMessageFiredRef = useRef(false);
 
   useEffect(() => {
     setMessages(thread.messages ?? []);
   }, [thread.id, thread.messages]);
 
+  // Auto-send the initialMessage (from a welcome-screen suggestion chip) once
+  useEffect(() => {
+    if (initialMessage && !initialMessageFiredRef.current && !isLoading) {
+      initialMessageFiredRef.current = true;
+      onMessageSent?.();
+      // Small delay so the chat window has rendered before we start streaming
+      setTimeout(() => sendMessage(initialMessage), 50);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialMessage]);
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, streaming]);
 
-  async function sendMessage() {
-    const text = input.trim();
+  async function sendMessage(overrideText?: string) {
+    const text = (overrideText ?? input).trim();
     if (!text || isLoading) return;
 
-    setInput("");
+    if (!overrideText) setInput("");
     setIsLoading(true);
 
     const userMsg: ChatMessage = {
@@ -244,7 +264,7 @@ export default function ChatWindow({ thread, onThreadUpdate }: ChatWindowProps) 
             style={{ color: "var(--text-primary)", maxHeight: 160 }}
           />
           <button
-            onClick={sendMessage}
+            onClick={() => sendMessage()}
             disabled={!input.trim() || isLoading}
             className="shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all"
             style={{
