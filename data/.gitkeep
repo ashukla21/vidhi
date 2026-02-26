@@ -1,0 +1,4 @@
+# Astro Data Directory
+Place astro_planet_data.sqlite here after running:
+  python3 scripts/download_astro_data.py
+
