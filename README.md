@@ -12,10 +12,15 @@ A full-stack AI system for investment analysis using Vedic astrology data (1990â
 
 ## Setup
 
+> **Important:** This project uses **Prisma 7** (installed locally via npm). Always use
+> `npm run db:migrate` / `npm run db:generate` instead of running `npx prisma` directly â€”
+> `npx` may pick up a different global version and fail.
+
 ### 1. Install dependencies
 
 ```bash
 npm install
+# This also runs `prisma generate` automatically via the postinstall hook
 ```
 
 ### 2. Configure environment
@@ -28,13 +33,14 @@ cp .env.example .env
 ### 3. Set up the database
 
 ```bash
-npx prisma migrate dev
+npm run db:migrate
+# Equivalent to: ./node_modules/.bin/prisma migrate dev
 ```
 
 ### 4. Download the astro dataset
 
 ```bash
-pip install datasets pyarrow pandas
+pip install huggingface_hub pandas pyarrow
 python3 scripts/download_astro_data.py
 ```
 
