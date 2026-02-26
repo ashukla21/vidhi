@@ -1,6 +1,6 @@
 # Vidhi — Vedic Astrology Investment AI
 
-A full-stack AI system for investment analysis using Vedic astrology data (1990–2031), powered by Claude claude-sonnet-4-6 and a black/purple RobinHood-inspired UI.
+A full-stack AI system for investment analysis using Vedic astrology data (1990–2031), powered by Claude claude-sonnet-4-6.
 
 ## Features
 
