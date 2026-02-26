@@ -49,3 +49,5 @@ next-env.d.ts
 # Prisma database
 /prisma/dev.db
 /prisma/dev.db-journal
+dev.db
+dev.db-journal
