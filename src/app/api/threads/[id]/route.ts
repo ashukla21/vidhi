@@ -11,7 +11,14 @@ export async function GET(
     include: { messages: { orderBy: { createdAt: "asc" } } },
   });
   if (!thread) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  return NextResponse.json(thread);
+  const parsed = {
+    ...thread,
+    messages: thread.messages.map((m) => ({
+      ...m,
+      toolCalls: typeof m.toolCalls === "string" ? JSON.parse(m.toolCalls) : m.toolCalls,
+    })),
+  };
+  return NextResponse.json(parsed);
 }
 
 export async function PATCH(
