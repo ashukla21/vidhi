@@ -436,7 +436,6 @@ code, pre, kbd, samp {
     rgba(168, 85, 247, 0.01) 40%,
     transparent 70%
   );
-  transition: background 0.08s linear;
 }
 
 /* ── Smooth sidebar ──────────────────────────────────────────────── */
