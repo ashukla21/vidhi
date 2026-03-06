@@ -10,6 +10,8 @@ A full-stack AI system for investment analysis using Vedic astrology data (1990�
 - **Portfolio Viewer** — IBKR Client Portal API integration (Phase 3)
 - **Dark Purple UI** — RobinHood-inspired aesthetic
 
+---
+
 ## Setup
 
 > **Important:** This project uses **Prisma 7** (installed locally via npm). Always use
@@ -30,29 +32,72 @@ cp .env.example .env
 # Edit .env and add your ANTHROPIC_API_KEY
 ```
 
-### 3. Set up the database
+### 3. Set up the app database
 
 ```bash
 npm run db:migrate
 # Equivalent to: ./node_modules/.bin/prisma migrate dev
 ```
 
-### 4. Download the astro dataset
+### 4. Get the raw astro data (CSVs)
+
+> **Skip this step if you already have `data/raw/` populated.**
+> The folder should contain year subfolders (`1990/`, `1991/`, ... `2031/`) each
+> with monthly CSV files (e.g. `1990_1.csv`, `1990_2.csv`, ...).
+> If that structure is already present on your machine, go straight to Step 5.
+
+Install `gdown` and download from Google Drive:
 
 ```bash
-pip install huggingface_hub pandas pyarrow
+pip install gdown
+python3 scripts/download_raw_data.py
+```
+
+This downloads the raw CSV dataset (~1990–2031) from Google Drive into `data/raw/`.
+The script automatically skips if `data/raw/` already contains CSV files.
+
+### 5. Build the astro SQLite database
+
+```bash
+pip install pandas pyarrow   # skip if already installed
 python3 scripts/download_astro_data.py
 ```
 
-Downloads `vedastro-org/Astro_Planet_Data` from HuggingFace into `data/astro_planet_data.sqlite`.
+Reads all CSVs from `data/raw/`, processes them into long format, and writes
+`data/astro_planet_data.sqlite` (the file Claude queries at runtime).
 
-### 5. Run the dev server
+### 6. Run the dev server
 
 ```bash
 npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
+
+---
+
+## Quick-start summary
+
+```
+# First-time setup (no existing data)
+npm install
+cp .env.example .env          # add ANTHROPIC_API_KEY
+npm run db:migrate
+pip install gdown pandas pyarrow
+python3 scripts/download_raw_data.py      # download CSVs from Drive
+python3 scripts/download_astro_data.py   # build SQLite from CSVs
+npm run dev
+
+# If you already have data/raw/ with the year folders
+npm install
+cp .env.example .env          # add ANTHROPIC_API_KEY
+npm run db:migrate
+pip install pandas pyarrow
+python3 scripts/download_astro_data.py   # build SQLite directly
+npm run dev
+```
+
+---
 
 ## Project Structure
 
@@ -76,15 +121,20 @@ src/
   types/index.ts          # TypeScript types
 
 scripts/
-  download_astro_data.py  # HuggingFace -> SQLite pipeline
+  download_raw_data.py    # Google Drive → data/raw/ (CSVs)
+  download_astro_data.py  # data/raw/ CSVs → data/astro_planet_data.sqlite
 
 data/
-  astro_planet_data.sqlite  # (gitignored, run script above)
+  raw/                      # (gitignored) Year subfolders with monthly CSVs
+    1990/ … 2031/
+  astro_planet_data.sqlite  # (gitignored) Built by download_astro_data.py
   astro_data_summary.json   # Dataset metadata
 
 prisma/
   schema.prisma           # Folder / Thread / Message models
 ```
+
+---
 
 ## Astrology Tools Available to Claude
 
