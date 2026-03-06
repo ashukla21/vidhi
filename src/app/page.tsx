@@ -109,6 +109,15 @@ export default function Home() {
     setFolders((prev) => prev.map((f) => (f.id === id ? { ...f, name } : f)));
   }
 
+  async function moveThread(threadId: string, folderId: string | null) {
+    await fetch(`/api/threads/${threadId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ folderId }),
+    });
+    await loadSidebarData();
+  }
+
   const activeThread = threads.find((t) => t.id === activeThreadId) || null;
 
   return (
@@ -126,6 +135,7 @@ export default function Home() {
         onDeleteFolder={deleteFolder}
         onRenameThread={renameThread}
         onRenameFolder={renameFolder}
+        onMoveThread={moveThread}
         onGoHome={() => setActiveThreadId(null)}
       />
 

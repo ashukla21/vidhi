@@ -18,6 +18,7 @@ interface SidebarProps {
   onDeleteFolder: (id: string) => void;
   onRenameThread: (id: string, title: string) => void;
   onRenameFolder: (id: string, name: string) => void;
+  onMoveThread: (threadId: string, folderId: string | null) => void;
   onGoHome: () => void;
 }
 
@@ -25,11 +26,18 @@ interface SidebarProps {
 function DotsMenu({
   onRename,
   onDelete,
+  folders,
+  currentFolderId,
+  onMoveToFolder,
 }: {
   onRename: () => void;
   onDelete: () => void;
+  folders?: ChatFolder[];
+  currentFolderId?: string | null;
+  onMoveToFolder?: (folderId: string | null) => void;
 }) {
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const [showFolders, setShowFolders] = useState(false);
   const btnRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -43,6 +51,7 @@ function DotsMenu({
         !btnRef.current.contains(e.target as Node)
       ) {
         setPos(null);
+        setShowFolders(false);
       }
     }
     document.addEventListener("mousedown", handleClick);
@@ -51,10 +60,13 @@ function DotsMenu({
 
   function openMenu(e: React.MouseEvent) {
     e.stopPropagation();
-    if (pos) { setPos(null); return; }
+    if (pos) { setPos(null); setShowFolders(false); return; }
     const rect = btnRef.current!.getBoundingClientRect();
     setPos({ top: rect.bottom + 4, left: rect.right + 6 });
+    setShowFolders(false);
   }
+
+  function close() { setPos(null); setShowFolders(false); }
 
   return (
     <>
@@ -75,7 +87,7 @@ function DotsMenu({
           style={{
             top: pos.top,
             left: pos.left,
-            minWidth: 140,
+            minWidth: 160,
             background: "rgba(18, 18, 18, 0.97)",
             border: "1px solid rgba(255,255,255,0.08)",
             backdropFilter: "blur(20px)",
@@ -85,14 +97,63 @@ function DotsMenu({
           <button
             className="w-full text-left px-4 py-2 text-xs transition-all liquid-glass-item"
             style={{ color: "var(--text-primary)" }}
-            onClick={() => { setPos(null); onRename(); }}
+            onClick={() => { close(); onRename(); }}
           >
             ✏️ Rename
           </button>
+
+          {onMoveToFolder && folders !== undefined && (
+            <>
+              <button
+                className="w-full text-left px-4 py-2 text-xs transition-all liquid-glass-item flex items-center justify-between"
+                style={{ color: "var(--text-primary)" }}
+                onClick={() => setShowFolders((v) => !v)}
+              >
+                <span>📁 Move to folder</span>
+                <span style={{ opacity: 0.5 }}>{showFolders ? "▴" : "▾"}</span>
+              </button>
+
+              {showFolders && (
+                <div
+                  className="mx-2 mb-1 rounded-lg overflow-hidden"
+                  style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}
+                >
+                  {currentFolderId && (
+                    <button
+                      className="w-full text-left px-3 py-1.5 text-xs transition-all liquid-glass-item"
+                      style={{ color: "var(--text-muted)" }}
+                      onClick={() => { close(); onMoveToFolder(null); }}
+                    >
+                      ✕ Remove from folder
+                    </button>
+                  )}
+                  {folders.length === 0 && (
+                    <div className="px-3 py-1.5 text-xs" style={{ color: "var(--text-muted)" }}>
+                      No folders yet
+                    </div>
+                  )}
+                  {folders.map((f) => (
+                    <button
+                      key={f.id}
+                      className="w-full text-left px-3 py-1.5 text-xs transition-all liquid-glass-item"
+                      style={{
+                        color: f.id === currentFolderId ? "var(--purple-light)" : "var(--text-primary)",
+                        fontWeight: f.id === currentFolderId ? 600 : 400,
+                      }}
+                      onClick={() => { close(); onMoveToFolder(f.id); }}
+                    >
+                      {f.id === currentFolderId ? "✓ " : ""}{f.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+
           <button
             className="w-full text-left px-4 py-2 text-xs transition-all liquid-glass-item"
             style={{ color: "var(--red)" }}
-            onClick={() => { setPos(null); onDelete(); }}
+            onClick={() => { close(); onDelete(); }}
           >
             🗑️ Delete
           </button>
@@ -116,6 +177,7 @@ export default function Sidebar({
   onDeleteFolder,
   onRenameThread,
   onRenameFolder,
+  onMoveThread,
   onGoHome,
 }: SidebarProps) {
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
@@ -292,21 +354,16 @@ export default function Sidebar({
                       isActive={thread.id === activeThreadId}
                       editingId={editingId}
                       editingValue={editingValue}
+                      folders={folders}
                       onSelect={() => onSelectThread(thread.id)}
                       onRename={() => startRename("thread", thread.id, thread.title)}
                       onDelete={() => onDeleteThread(thread.id)}
+                      onMoveToFolder={(folderId) => onMoveThread(thread.id, folderId)}
                       onEditChange={setEditingValue}
                       onCommitRename={() => commitRename("thread", thread.id)}
                       onCancelEdit={() => setEditingId(null)}
                     />
                   ))}
-                  <button
-                    onClick={() => onCreateThread(folder.id)}
-                    className="w-full text-left px-3 py-1.5 rounded-lg text-xs transition-all liquid-glass-item"
-                    style={{ color: "var(--text-muted)" }}
-                  >
-                    + Add chat
-                  </button>
                 </div>
               )}
             </div>
@@ -358,9 +415,11 @@ export default function Sidebar({
               isActive={thread.id === activeThreadId}
               editingId={editingId}
               editingValue={editingValue}
+              folders={folders}
               onSelect={() => onSelectThread(thread.id)}
               onRename={() => startRename("thread", thread.id, thread.title)}
               onDelete={() => onDeleteThread(thread.id)}
+              onMoveToFolder={(folderId) => onMoveThread(thread.id, folderId)}
               onEditChange={setEditingValue}
               onCommitRename={() => commitRename("thread", thread.id)}
               onCancelEdit={() => setEditingId(null)}
@@ -385,9 +444,11 @@ function ThreadItem({
   isActive,
   editingId,
   editingValue,
+  folders,
   onSelect,
   onRename,
   onDelete,
+  onMoveToFolder,
   onEditChange,
   onCommitRename,
   onCancelEdit,
@@ -396,9 +457,11 @@ function ThreadItem({
   isActive: boolean;
   editingId: string | null;
   editingValue: string;
+  folders: ChatFolder[];
   onSelect: () => void;
   onRename: () => void;
   onDelete: () => void;
+  onMoveToFolder: (folderId: string | null) => void;
   onEditChange: (v: string) => void;
   onCommitRename: () => void;
   onCancelEdit: () => void;
@@ -446,7 +509,13 @@ function ThreadItem({
       )}
 
       {!isEditing && (
-        <DotsMenu onRename={onRename} onDelete={onDelete} />
+        <DotsMenu
+          onRename={onRename}
+          onDelete={onDelete}
+          folders={folders}
+          currentFolderId={thread.folderId ?? null}
+          onMoveToFolder={onMoveToFolder}
+        />
       )}
     </div>
   );
