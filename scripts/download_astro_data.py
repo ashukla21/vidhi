@@ -11,7 +11,7 @@ The CSVs are in wide format produced by vedastro:
   Moon Rashi | Moon Nakshatra | Moon Pada |
   Sun Rashi  | Sun Nakshatra  | Sun Pada  | ... (one group per planet)
 
-Date column format in source CSVs: DD/MM/YYYY  (e.g. 01/01/1990)
+Date column format in source CSVs: DD-MM-YYYY  (e.g. 01-01-1990)
 
 Output:
   data/astro_planet_data.sqlite  — SQLite DB (table: astro_planet_data)
@@ -77,7 +77,7 @@ def normalize_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     df.columns = [c.lower().strip().replace(" ", "_") for c in df.columns]
     print(f"\nColumns found: {list(df.columns)}")
 
-    # ── 2. Parse dates — source format is DD/MM/YYYY ──────────────────────────
+    # ── 2. Parse dates — source format is DD-MM-YYYY (e.g. 01-01-1990) ────────
     date_col = next(
         (c for c in df.columns if c == "date" or c.endswith("_date")),
         next((c for c in df.columns if "date" in c), None),
@@ -86,9 +86,9 @@ def normalize_dataframe(df: pd.DataFrame) -> pd.DataFrame:
         print("ERROR: No date column found.")
         sys.exit(1)
 
-    parsed = pd.to_datetime(df[date_col], format="%d/%m/%Y", errors="coerce")
+    parsed = pd.to_datetime(df[date_col], format="%d-%m-%Y", errors="coerce")
     if parsed.isna().all():
-        print("WARNING: DD/MM/YYYY parse failed, trying dayfirst inference...")
+        print("WARNING: DD-MM-YYYY parse failed, trying dayfirst inference...")
         parsed = pd.to_datetime(df[date_col], dayfirst=True, errors="coerce")
 
     df = df.copy()
@@ -200,8 +200,8 @@ def save_summary(df: pd.DataFrame):
         "date_min":         str(df["date"].min()),
         "date_max":         str(df["date"].max()),
         "unique_dates":     int(df["date"].nunique()),
-        "note_date_format": "Source CSVs use DD/MM/YYYY. Stored in DB as YYYY-MM-DD.",
-        "note_schema":      "Long format: one row per (date × planet). Columns: date, planet, sign, nakshatra, pada + meta.",
+        "note_date_format": "Source CSVs use DD-MM-YYYY. Stored in DB as YYYY-MM-DD.",
+        "note_schema":      "Long format: one row per (date x planet). Columns: date, planet, sign, nakshatra, pada + meta.",
     }
     for col in ["planet", "sign", "nakshatra"]:
         if col in df.columns:
