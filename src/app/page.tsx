@@ -1,22 +1,10 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import Sidebar from "@/components/layout/Sidebar";
 import ChatWindow from "@/components/chat/ChatWindow";
 import { ChatFolder, ChatThread } from "@/types";
 
-function CursorGlow() {
-  const divRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    function handleMove(e: MouseEvent) {
-      document.documentElement.style.setProperty("--mx", e.clientX + "px");
-      document.documentElement.style.setProperty("--my", e.clientY + "px");
-    }
-    window.addEventListener("mousemove", handleMove);
-    return () => window.removeEventListener("mousemove", handleMove);
-  }, []);
-  return <div ref={divRef} className="cursor-glow" />;
-}
 
 const AVAILABLE_MODELS = [
   { id: "claude-sonnet-4-6", label: "Sonnet 4.6", desc: "Fast & capable" },
@@ -125,7 +113,6 @@ export default function Home() {
 
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: "var(--bg-primary)" }}>
-      <CursorGlow />
       <Sidebar
         folders={folders}
         threads={threads}
