@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { ChatFolder, ChatThread } from "@/types";
 import { formatDateTime } from "@/lib/utils";
 
@@ -18,6 +19,88 @@ interface SidebarProps {
   onRenameThread: (id: string, title: string) => void;
   onRenameFolder: (id: string, name: string) => void;
   onGoHome: () => void;
+}
+
+/** Dropdown that portals to <body> and positions itself to the right of the trigger button */
+function DotsMenu({
+  onRename,
+  onDelete,
+}: {
+  onRename: () => void;
+  onDelete: () => void;
+}) {
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!pos) return;
+    function handleClick(e: MouseEvent) {
+      if (
+        menuRef.current &&
+        !menuRef.current.contains(e.target as Node) &&
+        btnRef.current &&
+        !btnRef.current.contains(e.target as Node)
+      ) {
+        setPos(null);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [pos]);
+
+  function openMenu(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (pos) { setPos(null); return; }
+    const rect = btnRef.current!.getBoundingClientRect();
+    setPos({ top: rect.bottom + 4, left: rect.right + 6 });
+  }
+
+  return (
+    <>
+      <button
+        ref={btnRef}
+        onClick={openMenu}
+        className="thread-dots opacity-0 group-hover:opacity-100 p-1 rounded"
+        style={{ color: "var(--text-muted)", fontSize: "16px", lineHeight: 1, flexShrink: 0 }}
+        title="Options"
+      >
+        &#8943;
+      </button>
+
+      {pos && typeof document !== "undefined" && createPortal(
+        <div
+          ref={menuRef}
+          className="fixed z-[9999] rounded-xl py-1 shadow-2xl"
+          style={{
+            top: pos.top,
+            left: pos.left,
+            minWidth: 140,
+            background: "rgba(18, 18, 18, 0.97)",
+            border: "1px solid rgba(255,255,255,0.08)",
+            backdropFilter: "blur(20px)",
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            className="w-full text-left px-4 py-2 text-xs transition-all liquid-glass-item"
+            style={{ color: "var(--text-primary)" }}
+            onClick={() => { setPos(null); onRename(); }}
+          >
+            ✏️ Rename
+          </button>
+          <button
+            className="w-full text-left px-4 py-2 text-xs transition-all liquid-glass-item"
+            style={{ color: "var(--red)" }}
+            onClick={() => { setPos(null); onDelete(); }}
+          >
+            🗑️ Delete
+          </button>
+        </div>,
+        document.body
+      )}
+    </>
+  );
 }
 
 export default function Sidebar({
@@ -139,9 +222,7 @@ export default function Sidebar({
       </div>
 
       {/* Full content — fades when collapsed */}
-      <div
-        className={`sidebar-content flex flex-col flex-1 overflow-hidden ${isOpen ? "" : "hidden"}`}
-      >
+      <div className={`sidebar-content flex flex-col flex-1 overflow-hidden ${isOpen ? "" : "hidden"}`}>
         {/* New chat button */}
         <div className="px-3 pt-3 shrink-0">
           <button
@@ -159,6 +240,7 @@ export default function Sidebar({
           {/* Folders */}
           {folders.map((folder) => (
             <div key={folder.id}>
+              {/* Folder row */}
               <div
                 className="flex items-center gap-1 px-2 py-1.5 rounded-lg cursor-pointer group liquid-glass-item"
                 style={{ color: "var(--text-secondary)" }}
@@ -184,6 +266,12 @@ export default function Sidebar({
                   />
                 ) : (
                   <span className="flex-1 text-sm truncate">{folder.name}</span>
+                )}
+                {editingId !== `folder:${folder.id}` && (
+                  <DotsMenu
+                    onRename={() => startRename("folder", folder.id, folder.name)}
+                    onDelete={() => onDeleteFolder(folder.id)}
+                  />
                 )}
               </div>
 
@@ -308,24 +396,10 @@ function ThreadItem({
   onCancelEdit: () => void;
 }) {
   const isEditing = editingId === `thread:${thread.id}`;
-  const [menuOpen, setMenuOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  // Close menu when clicking outside
-  useEffect(() => {
-    if (!menuOpen) return;
-    function handleClick(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [menuOpen]);
 
   return (
     <div
-      className="relative flex items-center gap-2 px-2 py-2 rounded-lg cursor-pointer group liquid-glass-item"
+      className="flex items-center gap-2 px-2 py-2 rounded-lg cursor-pointer group liquid-glass-item"
       style={{
         background: isActive ? "var(--purple-glow)" : "transparent",
         borderLeft: isActive ? "2px solid var(--purple-primary)" : "2px solid transparent",
@@ -363,44 +437,8 @@ function ThreadItem({
         </div>
       )}
 
-      {/* Three-dot menu button — appears on hover */}
       {!isEditing && (
-        <div className="relative" ref={menuRef}>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setMenuOpen((v) => !v);
-            }}
-            className="thread-dots opacity-0 group-hover:opacity-100 p-1 rounded transition-all"
-            style={{ color: "var(--text-muted)", fontSize: "16px", lineHeight: 1 }}
-            title="Options"
-          >
-            &#8943;
-          </button>
-
-          {menuOpen && (
-            <div
-              className="absolute right-0 top-full mt-1 z-50 rounded-lg py-1 liquid-glass shadow-xl"
-              style={{ minWidth: 130, background: "rgba(20, 20, 20, 0.96)" }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <button
-                className="w-full text-left px-3 py-1.5 text-xs transition-all liquid-glass-item"
-                style={{ color: "var(--text-primary)" }}
-                onClick={() => { setMenuOpen(false); onRename(); }}
-              >
-                &#9999;&#65039; Rename
-              </button>
-              <button
-                className="w-full text-left px-3 py-1.5 text-xs transition-all liquid-glass-item"
-                style={{ color: "var(--red)" }}
-                onClick={() => { setMenuOpen(false); onDelete(); }}
-              >
-                &#128465;&#65039; Delete
-              </button>
-            </div>
-          )}
-        </div>
+        <DotsMenu onRename={onRename} onDelete={onDelete} />
       )}
     </div>
   );
