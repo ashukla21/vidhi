@@ -13,9 +13,7 @@ A full-stack AI system for investment analysis using Vedic astrology data (1990�
 
 ## Setup
 
-> **Important:** This project uses **Prisma 7** (installed locally via npm). Always use
-> `npm run db:migrate` / `npm run db:generate` instead of running `npx prisma` directly —
-> `npx` may pick up a different global version and fail.
+> **Important:** Always use `npm run db:migrate` / `npm run db:generate` instead of `npx prisma` directly — `npx` may pick up a different global Prisma version and fail.
 
 ### 1. Install dependencies
 
