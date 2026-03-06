@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const Database = require('../node_modules/better-sqlite3');
 
-const dbPath = path.join(__dirname, '..', 'dev.db');
+const dbPath = path.join(__dirname, '..', 'prisma', 'dev.db');
 const RAW_DIR = path.join(__dirname, '..', 'data', 'raw');
 
 const db = new Database(dbPath);
