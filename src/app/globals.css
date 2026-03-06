@@ -425,22 +425,31 @@ code, pre, kbd, samp {
 }
 
 
-/* ── Smooth sidebar ──────────────────────────────────────────────── */
+/* ── Smooth sidebar with materialise/dematerialise ───────────────── */
 .sidebar-panel {
   transition:
-    width 0.35s cubic-bezier(0.4, 0, 0.2, 1),
-    min-width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    width 0.38s cubic-bezier(0.4, 0, 0.2, 1),
+    min-width 0.38s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
 }
 
+/* Content fades + blurs in/out — controlled via inline style (no display:none) */
 .sidebar-content {
-  transition: opacity 0.2s ease, transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  transition:
+    opacity 0.28s ease,
+    transform 0.32s cubic-bezier(0.4, 0, 0.2, 1),
+    filter 0.28s ease;
 }
 
-.sidebar-content.hidden {
-  opacity: 0;
-  pointer-events: none;
-  transform: translateX(-8px);
+/* ── View transition (chat ↔ home) ───────────────────────────────── */
+@keyframes view-materialise {
+  0%   { opacity: 0; transform: scale(0.985) translateY(8px); filter: blur(3px); }
+  60%  { filter: blur(0); }
+  100% { opacity: 1; transform: scale(1) translateY(0); filter: blur(0); }
+}
+
+.view-enter {
+  animation: view-materialise 0.32s cubic-bezier(0.4, 0, 0.2, 1) both;
 }
 
 /* ── Aurora / fluorescent bg on welcome screen ───────────────────── */

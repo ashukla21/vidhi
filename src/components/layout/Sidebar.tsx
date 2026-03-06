@@ -221,8 +221,18 @@ export default function Sidebar({
         )}
       </div>
 
-      {/* Full content — fades when collapsed */}
-      <div className={`sidebar-content flex flex-col flex-1 overflow-hidden ${isOpen ? "" : "hidden"}`}>
+      {/* Full content — materialises/dematerialises when collapsed */}
+      <div
+        className="sidebar-content flex flex-col flex-1 overflow-hidden"
+        style={{
+          opacity: isOpen ? 1 : 0,
+          pointerEvents: isOpen ? "auto" : "none",
+          transform: isOpen ? "translateX(0) scale(1)" : "translateX(-10px) scale(0.97)",
+          filter: isOpen ? "blur(0px)" : "blur(4px)",
+          // Delay fade-in slightly so the width expands first; collapse is instant
+          transitionDelay: isOpen ? "0.06s" : "0s",
+        }}
+      >
         {/* New chat button */}
         <div className="px-3 pt-3 shrink-0">
           <button

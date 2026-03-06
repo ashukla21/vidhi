@@ -130,37 +130,42 @@ export default function Home() {
       />
 
       <main
-        className="flex-1 flex flex-col min-w-0 transition-all duration-200"
+        className="flex-1 flex flex-col min-w-0"
         style={{ background: "var(--bg-primary)" }}
       >
-        {activeThread ? (
-          <ChatWindow
-            key={activeThread.id}
-            thread={activeThread}
-            initialMessage={pendingMessage}
-            onMessageSent={() => setPendingMessage(null)}
-            onThreadUpdate={(updated) =>
-              setThreads((prev) =>
-                prev.map((t) => (t.id === updated.id ? updated : t))
-              )
-            }
-            model={model}
-            onModelChange={setModel}
-            availableModels={AVAILABLE_MODELS}
-          />
-        ) : (
-          <WelcomeScreen
-            onNewChat={async (suggestion?: string) => {
-              const thread = await createThread();
-              if (thread && suggestion) {
-                setPendingMessage(suggestion);
+        {/* key changes on every view switch, triggering the view-enter animation */}
+        <div
+          key={activeThread ? activeThread.id : "welcome"}
+          className="view-enter flex-1 flex flex-col h-full"
+        >
+          {activeThread ? (
+            <ChatWindow
+              thread={activeThread}
+              initialMessage={pendingMessage}
+              onMessageSent={() => setPendingMessage(null)}
+              onThreadUpdate={(updated) =>
+                setThreads((prev) =>
+                  prev.map((t) => (t.id === updated.id ? updated : t))
+                )
               }
-            }}
-            model={model}
-            onModelChange={setModel}
-            availableModels={AVAILABLE_MODELS}
-          />
-        )}
+              model={model}
+              onModelChange={setModel}
+              availableModels={AVAILABLE_MODELS}
+            />
+          ) : (
+            <WelcomeScreen
+              onNewChat={async (suggestion?: string) => {
+                const thread = await createThread();
+                if (thread && suggestion) {
+                  setPendingMessage(suggestion);
+                }
+              }}
+              model={model}
+              onModelChange={setModel}
+              availableModels={AVAILABLE_MODELS}
+            />
+          )}
+        </div>
       </main>
     </div>
   );
