@@ -21,7 +21,7 @@ A full-stack AI system for investment analysis using Vedic astrology data (1990â
 
 ```bash
 npm install
-# Also runs `prisma generate` automatically via the postinstall hook
+npm run db:generate
 ```
 
 ### 2. Configure environment
@@ -76,6 +76,7 @@ Open [http://localhost:3000](http://localhost:3000).
 ```bash
 # First-time setup (no existing data)
 npm install
+npm run db:generate
 cp .env.example .env          # add ANTHROPIC_API_KEY
 npm run db:migrate
 pip install gdown pandas
@@ -85,6 +86,7 @@ npm run dev
 
 # If you already have data/raw/ with the year folders
 npm install
+npm run db:generate
 cp .env.example .env          # add ANTHROPIC_API_KEY
 npm run db:migrate
 pip install pandas
