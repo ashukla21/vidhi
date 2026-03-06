@@ -153,7 +153,7 @@ async function executeTool(
   toolInput: Record<string, unknown>
 ): Promise<string> {
   if (!isDataReady()) {
-    return JSON.stringify({ error: "Data not downloaded yet. Run: python3 scripts/download_astro_data.py" });
+    return JSON.stringify({ error: "Astro data not built yet. Run: python3 scripts/build_astro_sqlite.py" });
   }
 
   try {

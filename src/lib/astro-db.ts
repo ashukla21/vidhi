@@ -22,7 +22,7 @@ export function isDataReady(): boolean {
 function querySync(sql: string, params: unknown[] = []): Record<string, unknown>[] {
   if (!isDataReady()) {
     throw new Error(
-      "Astro data not downloaded yet. Run: python3 scripts/download_astro_data.py"
+      "Astro data not built yet. Run: python3 scripts/build_astro_sqlite.py"
     );
   }
   const database = getDb();

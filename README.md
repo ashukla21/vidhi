@@ -6,8 +6,7 @@ A full-stack AI system for investment analysis using Vedic astrology data (1990�
 
 - **AI Chat** — Claude claude-sonnet-4-6 with direct access to vedic planetary data via tool use
 - **Saved Threads & Folders** — organize ongoing investment discussions (e.g., "Bitcoin Strategy")
-- **Astro Data Tools** — Claude can query planetary positions, retrograde periods, sign transits, and run custom SQL
-- **Portfolio Viewer** — IBKR Client Portal API integration (Phase 3)
+- **Astro Data Tools** — Claude can query planetary positions, sign transits, and nakshatra data
 - **Dark Purple UI** — RobinHood-inspired aesthetic
 
 ---
@@ -22,7 +21,7 @@ A full-stack AI system for investment analysis using Vedic astrology data (1990�
 
 ```bash
 npm install
-# This also runs `prisma generate` automatically via the postinstall hook
+# Also runs `prisma generate` automatically via the postinstall hook
 ```
 
 ### 2. Configure environment
@@ -34,37 +33,33 @@ cp .env.example .env
 
 ### 3. Set up the app database
 
+Creates `prisma/dev.db` — stores chat threads, folders, and messages.
+
 ```bash
 npm run db:migrate
-# Equivalent to: ./node_modules/.bin/prisma migrate dev
 ```
 
 ### 4. Get the raw astro data (CSVs)
 
-> **Skip this step if you already have `data/raw/` populated.**
-> The folder should contain year subfolders (`1990/`, `1991/`, ... `2031/`) each
-> with monthly CSV files (e.g. `1990_1.csv`, `1990_2.csv`, ...).
-> If that structure is already present on your machine, go straight to Step 5.
-
-Install `gdown` and download from Google Drive:
+> **Skip if you already have `data/raw/` populated** with year subfolders
+> (`1990/`, `1991/`, ... `2031/`) each containing monthly CSV files
+> (`1990_1.csv`, `1990_2.csv`, ...). Jump straight to Step 5.
 
 ```bash
 pip install gdown
 python3 scripts/download_raw_data.py
 ```
 
-This downloads the raw CSV dataset (~1990–2031) from Google Drive into `data/raw/`.
-The script automatically skips if `data/raw/` already contains CSV files.
+Downloads the raw CSV dataset (~1990–2031) from Google Drive into `data/raw/`.
 
 ### 5. Build the astro SQLite database
 
 ```bash
-pip install pandas pyarrow   # skip if already installed
-python3 scripts/download_astro_data.py
+pip install pandas
+python3 scripts/build_astro_sqlite.py
 ```
 
-Reads all CSVs from `data/raw/`, processes them into long format, and writes
-`data/astro_planet_data.sqlite` (the file Claude queries at runtime).
+Reads all CSVs from `data/raw/`, processes them into `data/astro_planet_data.sqlite` — the file Claude queries at runtime. This step takes a few minutes (21M+ rows).
 
 ### 6. Run the dev server
 
@@ -78,22 +73,22 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ## Quick-start summary
 
-```
+```bash
 # First-time setup (no existing data)
 npm install
 cp .env.example .env          # add ANTHROPIC_API_KEY
 npm run db:migrate
-pip install gdown pandas pyarrow
-python3 scripts/download_raw_data.py      # download CSVs from Drive
-python3 scripts/download_astro_data.py   # build SQLite from CSVs
+pip install gdown pandas
+python3 scripts/download_raw_data.py   # download CSVs from Drive (~few GB)
+python3 scripts/build_astro_sqlite.py  # build SQLite from CSVs (~few min)
 npm run dev
 
 # If you already have data/raw/ with the year folders
 npm install
 cp .env.example .env          # add ANTHROPIC_API_KEY
 npm run db:migrate
-pip install pandas pyarrow
-python3 scripts/download_astro_data.py   # build SQLite directly
+pip install pandas
+python3 scripts/build_astro_sqlite.py  # build SQLite directly
 npm run dev
 ```
 
@@ -113,25 +108,25 @@ src/
     layout/Sidebar.tsx    # Left sidebar with folders & threads
     chat/
       ChatWindow.tsx      # Chat messages + streaming
-      ToolCallBadge.tsx   # Shows Claude data queries inline
   lib/
     prisma.ts             # Prisma client (SQLite via better-sqlite3)
-    astro-db.ts           # Astro data queries
+    astro-db.ts           # Astro data queries (reads astro_planet_data.sqlite)
     utils.ts              # Utilities
   types/index.ts          # TypeScript types
 
 scripts/
-  download_raw_data.py    # Google Drive → data/raw/ (CSVs)
-  download_astro_data.py  # data/raw/ CSVs → data/astro_planet_data.sqlite
+  download_raw_data.py    # Google Drive → data/raw/ (monthly CSVs)
+  build_astro_sqlite.py   # data/raw/ CSVs → data/astro_planet_data.sqlite
 
 data/
-  raw/                      # (gitignored) Year subfolders with monthly CSVs
+  raw/                        # (gitignored) Year subfolders with monthly CSVs
     1990/ … 2031/
-  astro_planet_data.sqlite  # (gitignored) Built by download_astro_data.py
-  astro_data_summary.json   # Dataset metadata
+  astro_planet_data.sqlite    # (gitignored) Built by build_astro_sqlite.py
+  astro_data_summary.json     # Dataset stats (date range, planets, row count)
 
 prisma/
   schema.prisma           # Folder / Thread / Message models
+  dev.db                  # (gitignored) App database — created by db:migrate
 ```
 
 ---
@@ -140,16 +135,13 @@ prisma/
 
 | Tool | Description |
 |---|---|
-| `get_planetary_positions` | Positions for a date range + planet filter |
-| `get_planet_in_sign` | All dates a planet was in a given sign |
-| `get_retrograde_periods` | Retrograde windows for any planet |
-| `get_planetary_transits` | Sign-change events (major turning points) |
-| `run_custom_query` | Arbitrary SQL SELECT against the dataset |
-| `get_data_summary` | Column names, date range, available planets |
+| `get_planetary_positions` | Daily positions (sign, nakshatra, pada) for any planet and date range |
+| `get_planet_in_sign` | All dates a planet was in a given zodiac sign |
+| `get_planetary_transits` | Sign-change events (when planets move between signs) |
 
 ## Example Questions
 
 - "What does Jupiter in Taurus mean for Bitcoin in 2025?"
-- "Show me every Saturn retrograde from 2010-2024"
+- "Show me every Saturn sign change from 2010–2024"
 - "What are the most auspicious windows to buy BTC in Q1 2026?"
 - "Compare Rahu/Ketu axis shifts vs Bitcoin cycle tops/bottoms"
