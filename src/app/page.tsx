@@ -5,12 +5,31 @@ import Sidebar from "@/components/layout/Sidebar";
 import ChatWindow from "@/components/chat/ChatWindow";
 import { ChatFolder, ChatThread } from "@/types";
 
+const AVAILABLE_MODELS = [
+  { id: "claude-sonnet-4-6", label: "Sonnet 4.6", desc: "Fast & capable" },
+  { id: "claude-opus-4-6", label: "Opus 4.6", desc: "Most capable" },
+  { id: "claude-haiku-4-5-20251001", label: "Haiku 4.5", desc: "Fastest" },
+];
+
 export default function Home() {
   const [folders, setFolders] = useState<ChatFolder[]>([]);
   const [threads, setThreads] = useState<ChatThread[]>([]);
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [pendingMessage, setPendingMessage] = useState<string | null>(null);
+  const [model, setModel] = useState("claude-sonnet-4-6");
+
+  // Persist model selection
+  useEffect(() => {
+    const saved = localStorage.getItem("vidhi-model");
+    if (saved && AVAILABLE_MODELS.some((m) => m.id === saved)) {
+      setModel(saved);
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem("vidhi-model", model);
+  }, [model]);
 
   useEffect(() => {
     loadSidebarData();
@@ -123,6 +142,9 @@ export default function Home() {
                 prev.map((t) => (t.id === updated.id ? updated : t))
               )
             }
+            model={model}
+            onModelChange={setModel}
+            availableModels={AVAILABLE_MODELS}
           />
         ) : (
           <WelcomeScreen
@@ -132,6 +154,9 @@ export default function Home() {
                 setPendingMessage(suggestion);
               }
             }}
+            model={model}
+            onModelChange={setModel}
+            availableModels={AVAILABLE_MODELS}
           />
         )}
       </main>
@@ -139,35 +164,60 @@ export default function Home() {
   );
 }
 
-function WelcomeScreen({ onNewChat }: { onNewChat: (suggestion?: string) => void }) {
+interface ModelOption {
+  id: string;
+  label: string;
+  desc: string;
+}
+
+function WelcomeScreen({
+  onNewChat,
+  model,
+  onModelChange,
+  availableModels,
+}: {
+  onNewChat: (suggestion?: string) => void;
+  model: string;
+  onModelChange: (m: string) => void;
+  availableModels: ModelOption[];
+}) {
   const suggestions = [
     "What does Jupiter in Taurus mean for Bitcoin in 2025?",
     "Analyze Saturn retrograde periods and crypto market corrections",
-    "Show me Rahu/Ketu axis shifts from 2020–2031 and their market implications",
+    "Show me Rahu/Ketu axis shifts from 2020-2031 and their market implications",
     "What are the most auspicious periods to buy BTC based on planetary transits?",
   ];
 
-  const planets = ["☉", "☽", "♂", "☿", "♃", "♀", "♄", "☊", "☋"];
+  const planets = ["\u2609", "\u263D", "\u2642", "\u263F", "\u2643", "\u2640", "\u2644", "\u260A", "\u260B"];
 
   return (
     <div className="flex-1 flex flex-col items-center justify-center p-8 gap-8">
+      {/* Model selector */}
+      <div className="absolute top-4 right-6">
+        <select
+          value={model}
+          onChange={(e) => onModelChange(e.target.value)}
+          className="model-select rounded-lg px-3 py-1.5 text-xs"
+          style={{ color: "var(--text-secondary)" }}
+        >
+          {availableModels.map((m) => (
+            <option key={m.id} value={m.id} style={{ background: "var(--bg-card)" }}>
+              {m.label} — {m.desc}
+            </option>
+          ))}
+        </select>
+      </div>
+
       <div className="text-center">
         <h1 className="text-5xl font-bold gradient-text mb-2">Vidhi</h1>
-        <p className="text-lg" style={{ color: "var(--text-secondary)" }}>
-          Vedic Astrology × Investment Intelligence
-        </p>
       </div>
 
       <div className="flex gap-3">
         {planets.map((symbol, i) => (
           <span
             key={i}
-            className="w-10 h-10 flex items-center justify-center rounded-full text-lg"
-            style={{
-              background: "var(--bg-card)",
-              border: "1px solid var(--border-subtle)",
-              color: "var(--purple-light)",
-            }}
+            className="w-10 h-10 flex items-center justify-center rounded-full text-lg liquid-glass"
+            style={{ color: "var(--purple-light)" }}
           >
             {symbol}
           </span>
@@ -179,22 +229,8 @@ function WelcomeScreen({ onNewChat }: { onNewChat: (suggestion?: string) => void
           <button
             key={i}
             onClick={() => onNewChat(s)}
-            className="text-left p-4 rounded-xl text-sm transition-all duration-150"
-            style={{
-              background: "var(--bg-card)",
-              border: "1px solid var(--border-subtle)",
-              color: "var(--text-secondary)",
-            }}
-            onMouseEnter={(e) => {
-              const el = e.currentTarget;
-              el.style.borderColor = "var(--purple-primary)";
-              el.style.color = "var(--text-primary)";
-            }}
-            onMouseLeave={(e) => {
-              const el = e.currentTarget;
-              el.style.borderColor = "var(--border-subtle)";
-              el.style.color = "var(--text-secondary)";
-            }}
+            className="text-left p-4 rounded-xl text-sm liquid-glass-card"
+            style={{ color: "var(--text-secondary)" }}
           >
             {s}
           </button>
@@ -203,14 +239,8 @@ function WelcomeScreen({ onNewChat }: { onNewChat: (suggestion?: string) => void
 
       <button
         onClick={() => onNewChat()}
-        className="px-8 py-3 rounded-full font-semibold text-white transition-all duration-150 glow-purple"
-        style={{ background: "var(--purple-primary)" }}
-        onMouseEnter={(e) => {
-          (e.currentTarget as HTMLButtonElement).style.background = "var(--purple-light)";
-        }}
-        onMouseLeave={(e) => {
-          (e.currentTarget as HTMLButtonElement).style.background = "var(--purple-primary)";
-        }}
+        className="px-8 py-3 rounded-full font-semibold text-white liquid-glass-btn"
+        style={{ background: "rgba(168, 85, 247, 0.3)" }}
       >
         Start New Chat
       </button>

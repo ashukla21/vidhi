@@ -12,6 +12,12 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
+const VALID_MODELS = [
+  "claude-sonnet-4-6",
+  "claude-opus-4-6",
+  "claude-haiku-4-5-20251001",
+];
+
 const SYSTEM_PROMPT = `You are Vidhi, an expert in Vedic astrology and investment analysis. You have direct access to a local planetary position dataset spanning 1990–2031, containing daily positions of the Sun, Moon, Mars, Mercury, Jupiter, Venus, Saturn, Rahu, and Ketu.
 
 Each record includes the planet's sign (rashi), nakshatra, and nakshatra pada for that date.
@@ -192,14 +198,23 @@ async function executeTool(
   }
 }
 
+interface Attachment {
+  type: "image" | "file";
+  name: string;
+  mediaType: string;
+  data: string; // base64
+}
+
 export async function POST(req: NextRequest) {
-  const { threadId, message } = await req.json();
+  const { threadId, message, model, attachments } = await req.json();
 
   if (!threadId || !message) {
     return new Response(JSON.stringify({ error: "threadId and message required" }), {
       status: 400,
     });
   }
+
+  const selectedModel = VALID_MODELS.includes(model) ? model : "claude-sonnet-4-6";
 
   // Save user message to DB
   await prisma.message.create({
@@ -212,10 +227,41 @@ export async function POST(req: NextRequest) {
     orderBy: { createdAt: "asc" },
   });
 
-  const conversationMessages: Anthropic.MessageParam[] = dbMessages.map((m) => ({
-    role: m.role as "user" | "assistant",
-    content: m.content,
-  }));
+  // Build conversation messages — all historical messages are text-only,
+  // only the current (last) user message may include attachments.
+  const conversationMessages: Anthropic.MessageParam[] = dbMessages.map((m, idx) => {
+    // For the last user message, include any attachments
+    if (idx === dbMessages.length - 1 && m.role === "user" && attachments?.length) {
+      const contentBlocks: Anthropic.ContentBlockParam[] = [];
+
+      for (const att of attachments as Attachment[]) {
+        if (att.type === "image") {
+          contentBlocks.push({
+            type: "image",
+            source: {
+              type: "base64",
+              media_type: att.mediaType as "image/jpeg" | "image/png" | "image/gif" | "image/webp",
+              data: att.data,
+            },
+          });
+        } else {
+          // Text file — prepend as a document block
+          contentBlocks.push({
+            type: "text",
+            text: `[Attached file: ${att.name}]\n${atob(att.data)}`,
+          });
+        }
+      }
+
+      contentBlocks.push({ type: "text", text: m.content });
+      return { role: "user" as const, content: contentBlocks };
+    }
+
+    return {
+      role: m.role as "user" | "assistant",
+      content: m.content,
+    };
+  });
 
   // Streaming response
   const encoder = new TextEncoder();
@@ -230,13 +276,11 @@ export async function POST(req: NextRequest) {
         let finalText = "";
 
         // Agentic loop — keep going until Claude stops using tools.
-        // Force a tool call on the first turn to ensure planetary claims are
-        // always grounded in the dataset before Claude writes a response.
         let isFirstTurn = true;
         // eslint-disable-next-line no-constant-condition
         while (true) {
           const response = await anthropic.messages.create({
-            model: "claude-sonnet-4-6",
+            model: selectedModel,
             max_tokens: 4096,
             system: SYSTEM_PROMPT,
             tools: ASTRO_TOOLS,
@@ -294,11 +338,28 @@ export async function POST(req: NextRequest) {
           },
         });
 
-        // Auto-update thread title from first user message if still default
+        // Auto-generate a summary title for new chats
         const thread = await prisma.thread.findUnique({ where: { id: threadId } });
         if (thread?.title === "New Chat") {
-          const title = message.slice(0, 60) + (message.length > 60 ? "..." : "");
-          await prisma.thread.update({ where: { id: threadId }, data: { title } });
+          try {
+            const summaryResponse = await anthropic.messages.create({
+              model: "claude-haiku-4-5-20251001",
+              max_tokens: 30,
+              messages: [{
+                role: "user",
+                content: `Summarize this question in 3-5 words as a short chat title. Return ONLY the title text, nothing else. No quotes, no punctuation at the end.\n\nQuestion: ${message}`,
+              }],
+            });
+            const titleBlock = summaryResponse.content[0];
+            const title = titleBlock.type === "text" ? titleBlock.text.trim() : message.slice(0, 40);
+            await prisma.thread.update({ where: { id: threadId }, data: { title } });
+            send({ type: "title", content: title });
+          } catch {
+            // Fallback to truncated message
+            const title = message.slice(0, 50) + (message.length > 50 ? "..." : "");
+            await prisma.thread.update({ where: { id: threadId }, data: { title } });
+            send({ type: "title", content: title });
+          }
         }
 
         send({ type: "done" });

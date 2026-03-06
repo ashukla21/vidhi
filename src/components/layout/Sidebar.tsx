@@ -99,19 +99,19 @@ export default function Sidebar({
       >
         <button
           onClick={onToggle}
-          className="p-2 rounded-lg transition-colors"
+          className="p-2 rounded-lg transition-all liquid-glass-item"
           style={{ color: "var(--text-secondary)" }}
           title="Open sidebar"
         >
-          ☰
+          &#9776;
         </button>
         <button
           onClick={() => onCreateThread()}
-          className="p-2 rounded-lg transition-colors"
+          className="p-2 rounded-lg transition-all liquid-glass-item"
           style={{ color: "var(--purple-light)" }}
           title="New chat"
         >
-          ✎
+          &#9998;
         </button>
       </div>
     );
@@ -140,19 +140,19 @@ export default function Sidebar({
           <div className="flex items-center gap-1">
             <button
               onClick={() => onCreateThread()}
-              className="p-1.5 rounded-lg text-sm transition-colors"
+              className="p-1.5 rounded-lg text-sm transition-all liquid-glass-item"
               style={{ color: "var(--purple-light)" }}
               title="New chat"
             >
-              ✎
+              &#9998;
             </button>
             <button
               onClick={onToggle}
-              className="p-1.5 rounded-lg text-sm transition-colors"
+              className="p-1.5 rounded-lg text-sm transition-all liquid-glass-item"
               style={{ color: "var(--text-muted)" }}
               title="Close sidebar"
             >
-              ←
+              &#8592;
             </button>
           </div>
         </div>
@@ -161,17 +161,8 @@ export default function Sidebar({
         <div className="px-3 pt-3">
           <button
             onClick={() => onCreateThread()}
-            className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium transition-all"
-            style={{
-              background: "var(--purple-primary)",
-              color: "white",
-            }}
-            onMouseEnter={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.background = "var(--purple-light)";
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.background = "var(--purple-primary)";
-            }}
+            className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium liquid-glass-btn"
+            style={{ color: "white" }}
           >
             <span>+</span>
             <span>New Chat</span>
@@ -184,21 +175,15 @@ export default function Sidebar({
           {folders.map((folder) => (
             <div key={folder.id}>
               <div
-                className="flex items-center gap-1 px-2 py-1.5 rounded-lg cursor-pointer group"
+                className="flex items-center gap-1 px-2 py-1.5 rounded-lg cursor-pointer group liquid-glass-item"
                 style={{ color: "var(--text-secondary)" }}
                 onClick={() => toggleFolder(folder.id)}
                 onContextMenu={(e) => handleContextMenu(e, "folder", folder.id)}
-                onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLElement).style.background = "var(--bg-hover)";
-                }}
-                onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLElement).style.background = "transparent";
-                }}
               >
                 <span className="text-xs transition-transform duration-150">
-                  {expandedFolders.has(folder.id) ? "▾" : "▸"}
+                  {expandedFolders.has(folder.id) ? "\u25BE" : "\u25B8"}
                 </span>
-                <span className="text-sm mr-1">📁</span>
+                <span className="text-sm mr-1">&#128193;</span>
                 {editingId === `folder:${folder.id}` ? (
                   <input
                     autoFocus
@@ -242,14 +227,8 @@ export default function Sidebar({
                   ))}
                   <button
                     onClick={() => onCreateThread(folder.id)}
-                    className="w-full text-left px-3 py-1.5 rounded-lg text-xs transition-colors"
+                    className="w-full text-left px-3 py-1.5 rounded-lg text-xs transition-all liquid-glass-item"
                     style={{ color: "var(--text-muted)" }}
-                    onMouseEnter={(e) => {
-                      (e.currentTarget as HTMLButtonElement).style.color = "var(--purple-light)";
-                    }}
-                    onMouseLeave={(e) => {
-                      (e.currentTarget as HTMLButtonElement).style.color = "var(--text-muted)";
-                    }}
                   >
                     + Add chat
                   </button>
@@ -261,10 +240,9 @@ export default function Sidebar({
           {/* New folder input */}
           {newFolderMode ? (
             <div
-              className="flex items-center gap-1 px-2 py-1.5 rounded-lg"
-              style={{ background: "var(--bg-hover)" }}
+              className="flex items-center gap-1 px-2 py-1.5 rounded-lg liquid-glass"
             >
-              <span className="text-sm">📁</span>
+              <span className="text-sm">&#128193;</span>
               <input
                 autoFocus
                 value={newFolderName}
@@ -282,20 +260,14 @@ export default function Sidebar({
           ) : (
             <button
               onClick={() => setNewFolderMode(true)}
-              className="w-full text-left px-2 py-1.5 rounded-lg text-xs transition-colors"
+              className="w-full text-left px-2 py-1.5 rounded-lg text-xs transition-all liquid-glass-item"
               style={{ color: "var(--text-muted)" }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.color = "var(--purple-light)";
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.color = "var(--text-muted)";
-              }}
             >
               + New Folder
             </button>
           )}
 
-          {/* Separator if there are loose threads */}
+          {/* Separator */}
           {loosThreads.length > 0 && (
             <div
               className="my-2 text-xs px-2 pt-2"
@@ -308,7 +280,7 @@ export default function Sidebar({
             </div>
           )}
 
-          {/* Loose threads (no folder) */}
+          {/* Loose threads */}
           {loosThreads.map((thread) => (
             <ThreadItem
               key={thread.id}
@@ -340,24 +312,16 @@ export default function Sidebar({
       {/* Context menu */}
       {contextMenu && (
         <div
-          className="fixed z-50 rounded-xl py-1 shadow-xl"
+          className="fixed z-50 rounded-xl py-1 shadow-xl liquid-glass"
           style={{
             left: contextMenu.x,
             top: contextMenu.y,
-            background: "var(--bg-card)",
-            border: "1px solid var(--border-subtle)",
             minWidth: 160,
           }}
         >
           <button
-            className="w-full text-left px-4 py-2 text-sm transition-colors"
+            className="w-full text-left px-4 py-2 text-sm transition-all liquid-glass-item"
             style={{ color: "var(--text-primary)" }}
-            onMouseEnter={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.background = "var(--bg-hover)";
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.background = "transparent";
-            }}
             onClick={() => {
               const item =
                 contextMenu.type === "thread"
@@ -366,24 +330,18 @@ export default function Sidebar({
               if (item) startRename(contextMenu.type, contextMenu.id, (item as ChatThread).title ?? (item as ChatFolder).name);
             }}
           >
-            ✏️ Rename
+            &#9999;&#65039; Rename
           </button>
           <button
-            className="w-full text-left px-4 py-2 text-sm transition-colors"
+            className="w-full text-left px-4 py-2 text-sm transition-all liquid-glass-item"
             style={{ color: "var(--red)" }}
-            onMouseEnter={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.background = "var(--bg-hover)";
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.background = "transparent";
-            }}
             onClick={() => {
               if (contextMenu.type === "thread") onDeleteThread(contextMenu.id);
               else onDeleteFolder(contextMenu.id);
               setContextMenu(null);
             }}
           >
-            🗑️ Delete
+            &#128465;&#65039; Delete
           </button>
         </div>
       )}
@@ -416,27 +374,20 @@ function ThreadItem({
 
   return (
     <div
-      className="flex items-center gap-2 px-2 py-2 rounded-lg cursor-pointer group transition-colors"
+      className={`flex items-center gap-2 px-2 py-2 rounded-lg cursor-pointer group transition-all liquid-glass-item`}
       style={{
         background: isActive ? "var(--purple-glow)" : "transparent",
         borderLeft: isActive ? "2px solid var(--purple-primary)" : "2px solid transparent",
+        borderRight: "none",
+        borderTop: "none",
+        borderBottom: "none",
         color: isActive ? "var(--text-primary)" : "var(--text-secondary)",
       }}
       onClick={onSelect}
       onContextMenu={onContextMenu}
-      onMouseEnter={(e) => {
-        if (!isActive) {
-          (e.currentTarget as HTMLElement).style.background = "var(--bg-hover)";
-        }
-      }}
-      onMouseLeave={(e) => {
-        if (!isActive) {
-          (e.currentTarget as HTMLElement).style.background = "transparent";
-        }
-      }}
     >
       <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-        💬
+        &#128172;
       </span>
       {isEditing ? (
         <input
