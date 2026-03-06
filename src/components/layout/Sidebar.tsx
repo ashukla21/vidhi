@@ -227,10 +227,8 @@ export default function Sidebar({
         style={{
           opacity: isOpen ? 1 : 0,
           pointerEvents: isOpen ? "auto" : "none",
-          transform: isOpen ? "translateX(0) scale(1)" : "translateX(-10px) scale(0.97)",
-          filter: isOpen ? "blur(0px)" : "blur(4px)",
-          // Delay fade-in slightly so the width expands first; collapse is instant
-          transitionDelay: isOpen ? "0.06s" : "0s",
+          transform: isOpen ? "translateX(0)" : "translateX(-8px)",
+          transitionDelay: isOpen ? "0.04s" : "0s",
         }}
       >
         {/* New chat button */}
