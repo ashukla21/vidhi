@@ -42,11 +42,11 @@ next-env.d.ts
 
 /src/generated/prisma
 
-# Astro data — SQLite DB is built locally, not committed
+# Astro data — SQLite DB and raw CSVs are built/downloaded locally (4GB+)
 /data/*.sqlite
 /data/*.parquet
 /data/*.json
-# data/raw/ CSVs ARE committed so the server can build the DB
+data/raw/
 
 # Prisma database
 /prisma/dev.db

@@ -20,8 +20,8 @@ model Thread {
   title     String    @default("New Chat")
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
-  folder    Folder?   @relation(fields: [folderId], references: [id], onDelete: SetNull)
   messages  Message[]
+  folder    Folder?   @relation(fields: [folderId], references: [id])
 }
 
 model Message {
@@ -32,4 +32,44 @@ model Message {
   toolCalls String?
   createdAt DateTime @default(now())
   thread    Thread   @relation(fields: [threadId], references: [id], onDelete: Cascade)
+}
+
+model AstroData {
+  id               Int    @id @default(autoincrement())
+  date             String
+  time             Float
+  tithi            String
+  paksha           String
+  horaPlanet       String
+  panchak          String
+  lagna            String
+  moonRashi        String
+  moonNakshatra    String
+  moonPada         Int
+  sunRashi         String
+  sunNakshatra     String
+  sunPada          Int
+  marsRashi        String
+  marsNakshatra    String
+  marsPada         Int
+  mercuryRashi     String
+  mercuryNakshatra String
+  mercuryPada      Int
+  jupiterRashi     String
+  jupiterNakshatra String
+  jupiterPada      Int
+  venusRashi       String
+  venusNakshatra   String
+  venusPada        Int
+  saturnRashi      String
+  saturnNakshatra  String
+  saturnPada       Int
+  rahuRashi        String
+  rahuNakshatra    String
+  rahuPada         Int
+  ketuRashi        String
+  ketuNakshatra    String
+  ketuPada         Int
+
+  @@index([date])
 }
