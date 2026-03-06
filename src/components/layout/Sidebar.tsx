@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { ChatFolder, ChatThread } from "@/types";
 import { formatDateTime } from "@/lib/utils";
 
@@ -40,12 +40,6 @@ export default function Sidebar({
   const [editingValue, setEditingValue] = useState("");
   const [newFolderMode, setNewFolderMode] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
-  const [contextMenu, setContextMenu] = useState<{
-    type: "thread" | "folder";
-    id: string;
-    x: number;
-    y: number;
-  } | null>(null);
 
   const loosThreads = threads.filter((t) => !t.folderId);
 
@@ -61,7 +55,6 @@ export default function Sidebar({
   function startRename(type: "thread" | "folder", id: string, currentName: string) {
     setEditingId(`${type}:${id}`);
     setEditingValue(currentName);
-    setContextMenu(null);
   }
 
   function commitRename(type: "thread" | "folder", id: string) {
@@ -72,15 +65,6 @@ export default function Sidebar({
     setEditingId(null);
   }
 
-  function handleContextMenu(
-    e: React.MouseEvent,
-    type: "thread" | "folder",
-    id: string
-  ) {
-    e.preventDefault();
-    setContextMenu({ type, id, x: e.clientX, y: e.clientY });
-  }
-
   function handleCreateFolder() {
     if (newFolderName.trim()) {
       onCreateFolder(newFolderName.trim());
@@ -89,84 +73,77 @@ export default function Sidebar({
     }
   }
 
-  if (!isOpen) {
-    return (
-      <div
-        className="flex flex-col items-center py-4 gap-3"
-        style={{
-          width: 56,
-          background: "var(--bg-secondary)",
-          borderRight: "1px solid var(--border-subtle)",
-        }}
-      >
-        <button
-          onClick={onToggle}
-          className="p-2 rounded-lg transition-all liquid-glass-item"
-          style={{ color: "var(--text-secondary)" }}
-          title="Open sidebar"
-        >
-          &#9776;
-        </button>
-        <button
-          onClick={() => onCreateThread()}
-          className="p-2 rounded-lg transition-all liquid-glass-item"
-          style={{ color: "var(--purple-light)" }}
-          title="New chat"
-        >
-          &#9998;
-        </button>
-      </div>
-    );
-  }
-
   return (
-    <>
+    <div
+      className="sidebar-panel flex flex-col h-full flex-shrink-0"
+      style={{
+        width: isOpen ? 260 : 56,
+        minWidth: isOpen ? 260 : 56,
+        background: "var(--bg-secondary)",
+        borderRight: "1px solid var(--border-subtle)",
+      }}
+    >
+      {/* Header — always visible */}
       <div
-        className="flex flex-col h-full"
+        className="flex items-center px-3 py-4 shrink-0"
         style={{
-          width: 260,
-          minWidth: 260,
-          background: "var(--bg-secondary)",
-          borderRight: "1px solid var(--border-subtle)",
+          borderBottom: "1px solid var(--border-subtle)",
+          justifyContent: isOpen ? "space-between" : "center",
+          minHeight: 56,
         }}
-        onClick={() => contextMenu && setContextMenu(null)}
       >
-        {/* Header */}
-        <div
-          className="flex items-center justify-between px-4 py-4"
-          style={{ borderBottom: "1px solid var(--border-subtle)" }}
-        >
-          <div className="flex items-center gap-2">
-            <span
-              className="text-lg vidhi-sidebar"
-              onClick={onGoHome}
-              title="Go to home"
-            >
+        {isOpen ? (
+          <>
+            <span className="vidhi-sidebar text-lg" onClick={onGoHome} title="Home">
               Vidhi
             </span>
-          </div>
-          <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => onCreateThread()}
+                className="p-1.5 rounded-lg text-sm transition-all liquid-glass-item"
+                style={{ color: "var(--purple-light)" }}
+                title="New chat"
+              >
+                &#9998;
+              </button>
+              <button
+                onClick={onToggle}
+                className="p-1.5 rounded-lg text-sm transition-all liquid-glass-item"
+                style={{ color: "var(--text-muted)" }}
+                title="Close sidebar"
+              >
+                &#8592;
+              </button>
+            </div>
+          </>
+        ) : (
+          <div className="flex flex-col items-center gap-3">
+            <button
+              onClick={onToggle}
+              className="p-1.5 rounded-lg transition-all liquid-glass-item"
+              style={{ color: "var(--text-secondary)" }}
+              title="Open sidebar"
+            >
+              &#9776;
+            </button>
             <button
               onClick={() => onCreateThread()}
-              className="p-1.5 rounded-lg text-sm transition-all liquid-glass-item"
+              className="p-1.5 rounded-lg transition-all liquid-glass-item"
               style={{ color: "var(--purple-light)" }}
               title="New chat"
             >
               &#9998;
             </button>
-            <button
-              onClick={onToggle}
-              className="p-1.5 rounded-lg text-sm transition-all liquid-glass-item"
-              style={{ color: "var(--text-muted)" }}
-              title="Close sidebar"
-            >
-              &#8592;
-            </button>
           </div>
-        </div>
+        )}
+      </div>
 
+      {/* Full content — fades when collapsed */}
+      <div
+        className={`sidebar-content flex flex-col flex-1 overflow-hidden ${isOpen ? "" : "hidden"}`}
+      >
         {/* New chat button */}
-        <div className="px-3 pt-3">
+        <div className="px-3 pt-3 shrink-0">
           <button
             onClick={() => onCreateThread()}
             className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium liquid-glass-btn"
@@ -177,7 +154,7 @@ export default function Sidebar({
           </button>
         </div>
 
-        {/* Scrollable content */}
+        {/* Scrollable thread/folder list */}
         <div className="flex-1 overflow-y-auto px-3 py-2 space-y-1">
           {/* Folders */}
           {folders.map((folder) => (
@@ -186,9 +163,8 @@ export default function Sidebar({
                 className="flex items-center gap-1 px-2 py-1.5 rounded-lg cursor-pointer group liquid-glass-item"
                 style={{ color: "var(--text-secondary)" }}
                 onClick={() => toggleFolder(folder.id)}
-                onContextMenu={(e) => handleContextMenu(e, "folder", folder.id)}
               >
-                <span className="text-xs transition-transform duration-150">
+                <span className="text-xs">
                   {expandedFolders.has(folder.id) ? "\u25BE" : "\u25B8"}
                 </span>
                 <span className="text-sm mr-1">&#128193;</span>
@@ -209,12 +185,6 @@ export default function Sidebar({
                 ) : (
                   <span className="flex-1 text-sm truncate">{folder.name}</span>
                 )}
-                <span
-                  className="text-xs opacity-0 group-hover:opacity-100 transition-opacity ml-1"
-                  style={{ color: "var(--text-muted)" }}
-                >
-                  {folder.threads?.length ?? 0}
-                </span>
               </div>
 
               {expandedFolders.has(folder.id) && (
@@ -227,7 +197,8 @@ export default function Sidebar({
                       editingId={editingId}
                       editingValue={editingValue}
                       onSelect={() => onSelectThread(thread.id)}
-                      onContextMenu={(e) => handleContextMenu(e, "thread", thread.id)}
+                      onRename={() => startRename("thread", thread.id, thread.title)}
+                      onDelete={() => onDeleteThread(thread.id)}
                       onEditChange={setEditingValue}
                       onCommitRename={() => commitRename("thread", thread.id)}
                       onCancelEdit={() => setEditingId(null)}
@@ -247,9 +218,7 @@ export default function Sidebar({
 
           {/* New folder input */}
           {newFolderMode ? (
-            <div
-              className="flex items-center gap-1 px-2 py-1.5 rounded-lg liquid-glass"
-            >
+            <div className="flex items-center gap-1 px-2 py-1.5 rounded-lg liquid-glass">
               <span className="text-sm">&#128193;</span>
               <input
                 autoFocus
@@ -275,14 +244,11 @@ export default function Sidebar({
             </button>
           )}
 
-          {/* Separator */}
+          {/* Recent chats separator */}
           {loosThreads.length > 0 && (
             <div
               className="my-2 text-xs px-2 pt-2"
-              style={{
-                color: "var(--text-muted)",
-                borderTop: "1px solid var(--border-subtle)",
-              }}
+              style={{ color: "var(--text-muted)", borderTop: "1px solid var(--border-subtle)" }}
             >
               Recent Chats
             </div>
@@ -297,7 +263,8 @@ export default function Sidebar({
               editingId={editingId}
               editingValue={editingValue}
               onSelect={() => onSelectThread(thread.id)}
-              onContextMenu={(e) => handleContextMenu(e, "thread", thread.id)}
+              onRename={() => startRename("thread", thread.id, thread.title)}
+              onDelete={() => onDeleteThread(thread.id)}
               onEditChange={setEditingValue}
               onCommitRename={() => commitRename("thread", thread.id)}
               onCancelEdit={() => setEditingId(null)}
@@ -307,53 +274,13 @@ export default function Sidebar({
 
         {/* Footer */}
         <div
-          className="px-4 py-3 text-xs"
-          style={{
-            borderTop: "1px solid var(--border-subtle)",
-            color: "var(--text-muted)",
-          }}
+          className="px-4 py-3 text-xs shrink-0"
+          style={{ borderTop: "1px solid var(--border-subtle)", color: "var(--text-muted)" }}
         >
           Powered by Claude + Vedic Astrology
         </div>
       </div>
-
-      {/* Context menu */}
-      {contextMenu && (
-        <div
-          className="fixed z-50 rounded-xl py-1 shadow-xl liquid-glass"
-          style={{
-            left: contextMenu.x,
-            top: contextMenu.y,
-            minWidth: 160,
-          }}
-        >
-          <button
-            className="w-full text-left px-4 py-2 text-sm transition-all liquid-glass-item"
-            style={{ color: "var(--text-primary)" }}
-            onClick={() => {
-              const item =
-                contextMenu.type === "thread"
-                  ? threads.find((t) => t.id === contextMenu.id)
-                  : folders.find((f) => f.id === contextMenu.id);
-              if (item) startRename(contextMenu.type, contextMenu.id, (item as ChatThread).title ?? (item as ChatFolder).name);
-            }}
-          >
-            &#9999;&#65039; Rename
-          </button>
-          <button
-            className="w-full text-left px-4 py-2 text-sm transition-all liquid-glass-item"
-            style={{ color: "var(--red)" }}
-            onClick={() => {
-              if (contextMenu.type === "thread") onDeleteThread(contextMenu.id);
-              else onDeleteFolder(contextMenu.id);
-              setContextMenu(null);
-            }}
-          >
-            &#128465;&#65039; Delete
-          </button>
-        </div>
-      )}
-    </>
+    </div>
   );
 }
 
@@ -363,7 +290,8 @@ function ThreadItem({
   editingId,
   editingValue,
   onSelect,
-  onContextMenu,
+  onRename,
+  onDelete,
   onEditChange,
   onCommitRename,
   onCancelEdit,
@@ -373,16 +301,31 @@ function ThreadItem({
   editingId: string | null;
   editingValue: string;
   onSelect: () => void;
-  onContextMenu: (e: React.MouseEvent) => void;
+  onRename: () => void;
+  onDelete: () => void;
   onEditChange: (v: string) => void;
   onCommitRename: () => void;
   onCancelEdit: () => void;
 }) {
   const isEditing = editingId === `thread:${thread.id}`;
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    if (!menuOpen) return;
+    function handleClick(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [menuOpen]);
 
   return (
     <div
-      className={`flex items-center gap-2 px-2 py-2 rounded-lg cursor-pointer group transition-all liquid-glass-item`}
+      className="relative flex items-center gap-2 px-2 py-2 rounded-lg cursor-pointer group liquid-glass-item"
       style={{
         background: isActive ? "var(--purple-glow)" : "transparent",
         borderLeft: isActive ? "2px solid var(--purple-primary)" : "2px solid transparent",
@@ -392,11 +335,11 @@ function ThreadItem({
         color: isActive ? "var(--text-primary)" : "var(--text-secondary)",
       }}
       onClick={onSelect}
-      onContextMenu={onContextMenu}
     >
-      <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+      <span className="text-xs shrink-0" style={{ color: "var(--text-muted)" }}>
         &#128172;
       </span>
+
       {isEditing ? (
         <input
           autoFocus
@@ -417,6 +360,46 @@ function ThreadItem({
           <div className="text-xs truncate" style={{ color: "var(--text-muted)" }}>
             {formatDateTime(thread.updatedAt)}
           </div>
+        </div>
+      )}
+
+      {/* Three-dot menu button — appears on hover */}
+      {!isEditing && (
+        <div className="relative" ref={menuRef}>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setMenuOpen((v) => !v);
+            }}
+            className="thread-dots opacity-0 group-hover:opacity-100 p-1 rounded transition-all"
+            style={{ color: "var(--text-muted)", fontSize: "16px", lineHeight: 1 }}
+            title="Options"
+          >
+            &#8943;
+          </button>
+
+          {menuOpen && (
+            <div
+              className="absolute right-0 top-full mt-1 z-50 rounded-lg py-1 liquid-glass shadow-xl"
+              style={{ minWidth: 130, background: "rgba(20, 20, 20, 0.96)" }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                className="w-full text-left px-3 py-1.5 text-xs transition-all liquid-glass-item"
+                style={{ color: "var(--text-primary)" }}
+                onClick={() => { setMenuOpen(false); onRename(); }}
+              >
+                &#9999;&#65039; Rename
+              </button>
+              <button
+                className="w-full text-left px-3 py-1.5 text-xs transition-all liquid-glass-item"
+                style={{ color: "var(--red)" }}
+                onClick={() => { setMenuOpen(false); onDelete(); }}
+              >
+                &#128465;&#65039; Delete
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

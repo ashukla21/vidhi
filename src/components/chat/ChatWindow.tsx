@@ -394,7 +394,7 @@ export default function ChatWindow({
           <button
             onClick={() => sendMessage()}
             disabled={!input.trim() || isLoading}
-            className="shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all"
+            className="shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold send-btn"
             style={{
               background: input.trim() && !isLoading ? "var(--purple-primary)" : "rgba(255,255,255,0.05)",
               color: input.trim() && !isLoading ? "white" : "var(--text-muted)",
@@ -407,9 +407,6 @@ export default function ChatWindow({
             )}
           </button>
         </div>
-        <p className="text-xs text-center mt-2" style={{ color: "var(--text-muted)" }}>
-          For informational purposes only — not financial advice
-        </p>
       </div>{/* end centering wrapper */}
       </div>
     </div>
@@ -420,7 +417,7 @@ function MessageBubble({ message }: { message: ChatMessage }) {
   const isUser = message.role === "user";
 
   return (
-    <div className={`flex flex-col gap-1 ${isUser ? "items-end" : "items-start"} ${isUser ? "ml-auto" : ""}`} style={{ maxWidth: "100%" }}>
+    <div className={`flex flex-col gap-1 message-enter ${isUser ? "items-end" : "items-start"} ${isUser ? "ml-auto" : ""}`} style={{ maxWidth: "100%" }}>
       <div
         className={`px-4 py-3 rounded-2xl text-sm leading-relaxed ${!isUser ? "liquid-glass" : ""}`}
         style={{

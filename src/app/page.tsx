@@ -1,9 +1,22 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Sidebar from "@/components/layout/Sidebar";
 import ChatWindow from "@/components/chat/ChatWindow";
 import { ChatFolder, ChatThread } from "@/types";
+
+function CursorGlow() {
+  const divRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    function handleMove(e: MouseEvent) {
+      document.documentElement.style.setProperty("--mx", e.clientX + "px");
+      document.documentElement.style.setProperty("--my", e.clientY + "px");
+    }
+    window.addEventListener("mousemove", handleMove);
+    return () => window.removeEventListener("mousemove", handleMove);
+  }, []);
+  return <div ref={divRef} className="cursor-glow" />;
+}
 
 const AVAILABLE_MODELS = [
   { id: "claude-sonnet-4-6", label: "Sonnet 4.6", desc: "Fast & capable" },
@@ -112,6 +125,7 @@ export default function Home() {
 
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: "var(--bg-primary)" }}>
+      <CursorGlow />
       <Sidebar
         folders={folders}
         threads={threads}
@@ -192,9 +206,17 @@ function WelcomeScreen({
   const planets = ["\u2609", "\u263D", "\u2642", "\u263F", "\u2643", "\u2640", "\u2644", "\u260A", "\u260B"];
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center p-8 gap-8">
+    <div className="relative flex-1 flex flex-col items-center justify-center p-8 gap-8 overflow-hidden">
+      {/* Aurora fluorescent background */}
+      <div className="aurora-bg">
+        <div className="aurora-orb aurora-1" />
+        <div className="aurora-orb aurora-2" />
+        <div className="aurora-orb aurora-3" />
+        <div className="aurora-grid" />
+      </div>
+
       {/* Model selector */}
-      <div className="absolute top-4 right-6">
+      <div className="absolute top-4 right-6 z-10">
         <select
           value={model}
           onChange={(e) => onModelChange(e.target.value)}
@@ -209,13 +231,13 @@ function WelcomeScreen({
         </select>
       </div>
 
-      <div className="text-center">
+      <div className="text-center relative z-10">
         <h1 className="text-6xl mb-2">
           <span className="vidhi-aero" data-text="Vidhi">Vidhi</span>
         </h1>
       </div>
 
-      <div className="flex gap-3">
+      <div className="flex gap-3 relative z-10">
         {planets.map((symbol, i) => (
           <span
             key={i}
@@ -227,7 +249,7 @@ function WelcomeScreen({
         ))}
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-2xl w-full">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-2xl w-full relative z-10">
         {suggestions.map((s, i) => (
           <button
             key={i}
@@ -242,7 +264,7 @@ function WelcomeScreen({
 
       <button
         onClick={() => onNewChat()}
-        className="px-8 py-3 rounded-full font-semibold text-white liquid-glass-btn"
+        className="px-8 py-3 rounded-full font-semibold text-white liquid-glass-btn relative z-10"
         style={{ background: "rgba(168, 85, 247, 0.3)" }}
       >
         Start New Chat

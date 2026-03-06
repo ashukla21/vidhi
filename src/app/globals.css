@@ -368,25 +368,6 @@ code, pre, kbd, samp {
   filter: drop-shadow(0 0 20px rgba(191, 90, 242, 0.35));
 }
 
-/* Glass sheen sweep over the title */
-.vidhi-aero::after {
-  content: attr(data-text);
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    105deg,
-    transparent 30%,
-    rgba(255, 255, 255, 0.55) 50%,
-    transparent 70%
-  );
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  animation: aero-shimmer 4s ease-in-out infinite;
-  animation-delay: 1s;
-  pointer-events: none;
-}
-
 /* Sidebar Vidhi — smaller version, still Cinzel */
 .vidhi-sidebar {
   font-family: 'Cinzel', Georgia, serif;
@@ -401,4 +382,147 @@ code, pre, kbd, samp {
 
 .vidhi-sidebar:hover {
   filter: drop-shadow(0 0 8px rgba(191, 90, 242, 0.5));
+}
+
+/* Three-dot thread menu button */
+.thread-dots {
+  transition: opacity 0.2s ease, background 0.2s ease, color 0.2s ease;
+}
+
+.thread-dots:hover {
+  color: var(--purple-light) !important;
+  background: rgba(168, 85, 247, 0.12) !important;
+  opacity: 1 !important;
+}
+
+/* ── Send button glow ────────────────────────────────────────────── */
+.send-btn {
+  transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+}
+
+.send-btn:hover:not(:disabled) {
+  box-shadow:
+    0 0 14px rgba(168, 85, 247, 0.5),
+    0 0 28px rgba(168, 85, 247, 0.2),
+    inset 0 0 8px rgba(255, 255, 255, 0.1) !important;
+  transform: scale(1.1);
+}
+
+.send-btn:active:not(:disabled) {
+  transform: scale(0.93);
+}
+
+/* ── Message entrance animation (iOS-style bounce) ───────────────── */
+@keyframes msg-pop-in {
+  0%   { opacity: 0; transform: translateY(10px) scale(0.95); }
+  55%  { opacity: 1; transform: translateY(-3px) scale(1.02); }
+  75%  { transform: translateY(1px) scale(0.99); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.message-enter {
+  animation: msg-pop-in 0.38s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* ── Subtle cursor glow ──────────────────────────────────────────── */
+.cursor-glow {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  background: radial-gradient(
+    340px circle at var(--mx, -999px) var(--my, -999px),
+    rgba(168, 85, 247, 0.04) 0%,
+    rgba(168, 85, 247, 0.01) 40%,
+    transparent 70%
+  );
+  transition: background 0.08s linear;
+}
+
+/* ── Smooth sidebar ──────────────────────────────────────────────── */
+.sidebar-panel {
+  transition:
+    width 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+    min-width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+}
+
+.sidebar-content {
+  transition: opacity 0.2s ease, transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sidebar-content.hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-8px);
+}
+
+/* ── Aurora / fluorescent bg on welcome screen ───────────────────── */
+.aurora-bg {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.aurora-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(90px);
+}
+
+.aurora-1 {
+  width: 55vw;
+  height: 40vh;
+  background: radial-gradient(ellipse, rgba(168, 85, 247, 0.18), transparent 70%);
+  top: 10%;
+  left: 20%;
+  animation: aurora-drift-a 22s ease-in-out infinite;
+}
+
+.aurora-2 {
+  width: 40vw;
+  height: 35vh;
+  background: radial-gradient(ellipse, rgba(6, 182, 212, 0.1), transparent 70%);
+  top: 45%;
+  left: 55%;
+  animation: aurora-drift-b 28s ease-in-out infinite;
+}
+
+.aurora-3 {
+  width: 35vw;
+  height: 30vh;
+  background: radial-gradient(ellipse, rgba(232, 121, 249, 0.1), transparent 70%);
+  top: 60%;
+  left: 5%;
+  animation: aurora-drift-c 19s ease-in-out infinite;
+}
+
+/* Fine pixel grid for the "digital" texture */
+.aurora-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(168, 85, 247, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(168, 85, 247, 0.025) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+@keyframes aurora-drift-a {
+  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.7; }
+  30%       { transform: translate(5vw, 4vh) scale(1.08); opacity: 1; }
+  60%       { transform: translate(-4vw, -3vh) scale(0.94); opacity: 0.6; }
+}
+
+@keyframes aurora-drift-b {
+  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.6; }
+  40%       { transform: translate(-6vw, 5vh) scale(1.1); opacity: 0.9; }
+  70%       { transform: translate(4vw, -4vh) scale(0.95); opacity: 0.5; }
+}
+
+@keyframes aurora-drift-c {
+  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.5; }
+  35%       { transform: translate(5vw, -4vh) scale(1.06); opacity: 0.8; }
+  65%       { transform: translate(-3vw, 3vh) scale(0.96); opacity: 0.4; }
 }
