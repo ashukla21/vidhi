@@ -272,7 +272,8 @@ export default function ChatWindow({
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+      <div className="flex-1 overflow-y-auto py-4">
+        <div className="max-w-3xl mx-auto px-6 space-y-4">
         {messages.length === 0 && !streaming && (
           <div className="text-center py-16" style={{ color: "var(--text-muted)" }}>
             <div className="text-3xl mb-3 twinkling-star">&#10022;</div>
@@ -286,7 +287,7 @@ export default function ChatWindow({
 
         {/* Streaming / loading state */}
         {streaming !== null && (
-          <div className="flex flex-col gap-2 max-w-3xl">
+          <div className="flex flex-col gap-2">
             {!streaming.text && (
               <div className="flex items-center gap-3 px-4 py-3">
                 <span className="twinkling-star">&#10022;</span>
@@ -315,13 +316,15 @@ export default function ChatWindow({
         )}
 
         <div ref={bottomRef} />
+        </div>{/* end centering wrapper */}
       </div>
 
       {/* Input area */}
       <div
-        className="shrink-0 px-4 pb-4 pt-2"
+        className="shrink-0 pb-4 pt-2"
         style={{ borderTop: "1px solid var(--border-subtle)" }}
       >
+      <div className="max-w-3xl mx-auto px-6">
         {/* Attachment previews */}
         {attachments.length > 0 && (
           <div className="flex flex-wrap gap-2 mb-2">
@@ -361,17 +364,7 @@ export default function ChatWindow({
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={isLoading}
-            className="shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm transition-all"
-            style={{
-              color: isLoading ? "var(--text-muted)" : "var(--text-secondary)",
-            }}
-            onMouseEnter={(e) => {
-              if (!isLoading) (e.currentTarget as HTMLButtonElement).style.color = "var(--purple-light)";
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.color = isLoading ? "var(--text-muted)" : "var(--text-secondary)";
-            }}
-            title="Attach files"
+            className={`shrink-0 w-8 h-8 flex items-center justify-center text-base attach-btn ${isLoading ? "opacity-40 pointer-events-none" : ""}`}
           >
             &#128206;
           </button>
@@ -417,6 +410,7 @@ export default function ChatWindow({
         <p className="text-xs text-center mt-2" style={{ color: "var(--text-muted)" }}>
           For informational purposes only — not financial advice
         </p>
+      </div>{/* end centering wrapper */}
       </div>
     </div>
   );
@@ -426,7 +420,7 @@ function MessageBubble({ message }: { message: ChatMessage }) {
   const isUser = message.role === "user";
 
   return (
-    <div className={`flex flex-col gap-1 ${isUser ? "items-end" : "items-start"} max-w-3xl ${isUser ? "ml-auto" : ""}`}>
+    <div className={`flex flex-col gap-1 ${isUser ? "items-end" : "items-start"} ${isUser ? "ml-auto" : ""}`} style={{ maxWidth: "100%" }}>
       <div
         className={`px-4 py-3 rounded-2xl text-sm leading-relaxed ${!isUser ? "liquid-glass" : ""}`}
         style={{

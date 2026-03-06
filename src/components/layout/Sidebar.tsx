@@ -17,6 +17,7 @@ interface SidebarProps {
   onDeleteFolder: (id: string) => void;
   onRenameThread: (id: string, title: string) => void;
   onRenameFolder: (id: string, name: string) => void;
+  onGoHome: () => void;
 }
 
 export default function Sidebar({
@@ -32,6 +33,7 @@ export default function Sidebar({
   onDeleteFolder,
   onRenameThread,
   onRenameFolder,
+  onGoHome,
 }: SidebarProps) {
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -135,7 +137,13 @@ export default function Sidebar({
           style={{ borderBottom: "1px solid var(--border-subtle)" }}
         >
           <div className="flex items-center gap-2">
-            <span className="text-lg gradient-text font-bold">Vidhi</span>
+            <span
+              className="text-lg vidhi-sidebar"
+              onClick={onGoHome}
+              title="Go to home"
+            >
+              Vidhi
+            </span>
           </div>
           <div className="flex items-center gap-1">
             <button

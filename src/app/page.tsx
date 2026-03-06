@@ -125,6 +125,7 @@ export default function Home() {
         onDeleteFolder={deleteFolder}
         onRenameThread={renameThread}
         onRenameFolder={renameFolder}
+        onGoHome={() => setActiveThreadId(null)}
       />
 
       <main
@@ -209,7 +210,9 @@ function WelcomeScreen({
       </div>
 
       <div className="text-center">
-        <h1 className="text-5xl font-bold gradient-text mb-2">Vidhi</h1>
+        <h1 className="text-6xl mb-2">
+          <span className="vidhi-aero" data-text="Vidhi">Vidhi</span>
+        </h1>
       </div>
 
       <div className="flex gap-3">

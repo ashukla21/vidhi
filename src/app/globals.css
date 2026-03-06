@@ -54,9 +54,19 @@ body {
 body {
   background: var(--bg-primary);
   color: var(--text-primary);
-  font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Consolas', 'Liberation Mono', 'Menlo', 'Courier New', monospace;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  letter-spacing: -0.01em;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Monospace only for code blocks */
+code, pre, kbd, samp {
+  font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', 'Menlo', 'Courier New', monospace;
+  font-size: 0.875em;
+  letter-spacing: 0;
 }
 
 /* Smooth scrolling for all scrollable areas */
@@ -273,4 +283,122 @@ body {
 .attachment-chip:hover {
   background: rgba(168, 85, 247, 0.18);
   transform: scale(1.03);
+}
+
+/* Attachment button hover highlight */
+.attach-btn {
+  position: relative;
+  border-radius: 8px;
+  transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  color: var(--text-muted);
+}
+
+.attach-btn:hover {
+  color: var(--purple-light);
+  background: rgba(168, 85, 247, 0.12);
+  box-shadow:
+    0 0 12px rgba(168, 85, 247, 0.2),
+    inset 0 0 8px rgba(168, 85, 247, 0.05);
+  transform: scale(1.1);
+}
+
+.attach-btn:active {
+  transform: scale(0.95);
+}
+
+/* Tooltip for attach button */
+.attach-btn::after {
+  content: 'Attach file';
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  background: rgba(30, 30, 30, 0.95);
+  backdrop-filter: blur(12px);
+  color: var(--text-secondary);
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.attach-btn:hover::after {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* ── Frutiger Aero — Vidhi title animation ───────────────────────── */
+@keyframes frutiger-aero {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes aero-shimmer {
+  0%   { opacity: 0; transform: translateX(-100%) skewX(-20deg); }
+  40%  { opacity: 0.6; }
+  100% { opacity: 0; transform: translateX(300%) skewX(-20deg); }
+}
+
+.vidhi-aero {
+  font-family: 'Cinzel', 'Trajan Pro', Georgia, serif;
+  font-weight: 900;
+  background: linear-gradient(
+    135deg,
+    #bf5af2 0%,
+    #d8b4fe 18%,
+    #ffffff 30%,
+    #a5f3fc 42%,
+    #818cf8 55%,
+    #e879f9 68%,
+    #c084fc 80%,
+    #bf5af2 100%
+  );
+  background-size: 300% 300%;
+  animation: frutiger-aero 5s ease infinite;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  position: relative;
+  display: inline-block;
+  filter: drop-shadow(0 0 20px rgba(191, 90, 242, 0.35));
+}
+
+/* Glass sheen sweep over the title */
+.vidhi-aero::after {
+  content: attr(data-text);
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    105deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.55) 50%,
+    transparent 70%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: aero-shimmer 4s ease-in-out infinite;
+  animation-delay: 1s;
+  pointer-events: none;
+}
+
+/* Sidebar Vidhi — smaller version, still Cinzel */
+.vidhi-sidebar {
+  font-family: 'Cinzel', Georgia, serif;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--purple-neon), var(--purple-light));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  cursor: pointer;
+  transition: filter 0.3s ease;
+}
+
+.vidhi-sidebar:hover {
+  filter: drop-shadow(0 0 8px rgba(191, 90, 242, 0.5));
 }
