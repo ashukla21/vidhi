@@ -349,14 +349,14 @@ code, pre, kbd, samp {
   font-weight: 900;
   background: linear-gradient(
     135deg,
-    #bf5af2 0%,
-    #d8b4fe 18%,
-    #ffffff 30%,
-    #a5f3fc 42%,
-    #818cf8 55%,
-    #e879f9 68%,
-    #c084fc 80%,
-    #bf5af2 100%
+    #9333ea 0%,
+    #b07ee8 18%,
+    #d4aaee 30%,
+    #8bb8d4 42%,
+    #6366f1 55%,
+    #c45fd4 68%,
+    #a066d4 80%,
+    #9333ea 100%
   );
   background-size: 300% 300%;
   animation: frutiger-aero 5s ease infinite;
@@ -365,7 +365,7 @@ code, pre, kbd, samp {
   background-clip: text;
   position: relative;
   display: inline-block;
-  filter: drop-shadow(0 0 20px rgba(191, 90, 242, 0.35));
+  filter: drop-shadow(0 0 12px rgba(147, 51, 234, 0.2));
 }
 
 /* Sidebar Vidhi — smaller version, still Cinzel */
