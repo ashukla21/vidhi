@@ -61,6 +61,8 @@ export default function ChatWindow({
   const [isLoading, setIsLoading] = useState(false);
   const [attachments, setAttachments] = useState<AttachmentFile[]>([]);
   const [loadingMessage, setLoadingMessage] = useState(LOADING_MESSAGES[0]);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editText, setEditText] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -93,6 +95,22 @@ export default function ChatWindow({
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, streaming]);
+
+  // Refresh messages from DB (so we always have real IDs after a send completes)
+  const refreshMessages = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/threads/${thread.id}`);
+      const freshThread = await res.json();
+      setMessages(
+        freshThread.messages.map((m: ChatMessage & { toolCalls: string | null }) => ({
+          ...m,
+          toolCalls: typeof m.toolCalls === "string" ? JSON.parse(m.toolCalls) : m.toolCalls,
+        }))
+      );
+    } catch {
+      // silently fail — state already has the messages from streaming
+    }
+  }, [thread.id]);
 
   const sendMessage = useCallback(async (overrideText?: string) => {
     const text = (overrideText ?? input).trim();
@@ -136,7 +154,6 @@ export default function ChatWindow({
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
-      let fullText = "";
 
       while (true) {
         const { done, value } = await reader.read();
@@ -159,22 +176,14 @@ export default function ChatWindow({
           }
 
           if (chunk.type === "text" && chunk.content) {
-            fullText += chunk.content;
             setStreaming((s) => ({ text: (s?.text ?? "") + chunk.content! }));
           } else if (chunk.type === "title" && chunk.content) {
-            // Update thread title with AI-generated summary
             onThreadUpdate({ ...thread, title: chunk.content, updatedAt: new Date() });
           } else if (chunk.type === "done") {
-            const assistantMsg: ChatMessage = {
-              id: `temp-assistant-${Date.now()}`,
-              threadId: thread.id,
-              role: "assistant",
-              content: fullText,
-              createdAt: new Date(),
-            };
-            setMessages((prev) => [...prev, assistantMsg]);
             setStreaming(null);
             onThreadUpdate({ ...thread, updatedAt: new Date() });
+            // Refresh from DB so messages have real IDs (needed for edit/rerun)
+            await refreshMessages();
           } else if (chunk.type === "error") {
             throw new Error(chunk.error);
           }
@@ -196,7 +205,39 @@ export default function ChatWindow({
       setIsLoading(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [input, isLoading, thread, model, attachments, onThreadUpdate]);
+  }, [input, isLoading, thread, model, attachments, onThreadUpdate, refreshMessages]);
+
+  // Truncate messages from fromMessageId onwards, then resend text
+  const truncateAndSend = useCallback(async (fromMessage: ChatMessage, inclusive: boolean, text: string) => {
+    // Update local state first (optimistic)
+    setMessages((prev) => {
+      const idx = prev.findIndex((m) => m.id === fromMessage.id);
+      return idx === -1 ? prev : prev.slice(0, inclusive ? idx : idx + 1);
+    });
+
+    // Delete from DB (best-effort — if message has a temp ID the API will return 404 which is fine)
+    if (!fromMessage.id.startsWith("temp-")) {
+      await fetch(`/api/threads/${thread.id}/messages`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fromMessageId: fromMessage.id, inclusive }),
+      });
+    }
+
+    sendMessage(text);
+  }, [thread.id, sendMessage]);
+
+  const handleEditSave = useCallback((msg: ChatMessage) => {
+    const trimmed = editText.trim();
+    if (!trimmed) return;
+    setEditingId(null);
+    setEditText("");
+    truncateAndSend(msg, true, trimmed);
+  }, [editText, truncateAndSend]);
+
+  const handleRerun = useCallback((msg: ChatMessage) => {
+    truncateAndSend(msg, true, msg.content);
+  }, [truncateAndSend]);
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -282,7 +323,18 @@ export default function ChatWindow({
         )}
 
         {messages.map((msg) => (
-          <MessageBubble key={msg.id} message={msg} />
+          <MessageBubble
+            key={msg.id}
+            message={msg}
+            isEditing={editingId === msg.id}
+            editText={editingId === msg.id ? editText : ""}
+            onEditChange={setEditText}
+            onEditStart={() => { setEditingId(msg.id); setEditText(msg.content); }}
+            onEditSave={() => handleEditSave(msg)}
+            onEditCancel={() => { setEditingId(null); setEditText(""); }}
+            onRerun={() => handleRerun(msg)}
+            disabled={isLoading}
+          />
         ))}
 
         {/* Streaming / loading state */}
@@ -413,24 +465,145 @@ export default function ChatWindow({
   );
 }
 
-function MessageBubble({ message }: { message: ChatMessage }) {
+interface MessageBubbleProps {
+  message: ChatMessage;
+  isEditing?: boolean;
+  editText?: string;
+  onEditChange?: (text: string) => void;
+  onEditStart?: () => void;
+  onEditSave?: () => void;
+  onEditCancel?: () => void;
+  onRerun?: () => void;
+  disabled?: boolean;
+}
+
+function MessageBubble({
+  message,
+  isEditing,
+  editText,
+  onEditChange,
+  onEditStart,
+  onEditSave,
+  onEditCancel,
+  onRerun,
+  disabled,
+}: MessageBubbleProps) {
   const isUser = message.role === "user";
+  const [hovered, setHovered] = useState(false);
+
+  function handleEditKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      onEditSave?.();
+    }
+    if (e.key === "Escape") {
+      onEditCancel?.();
+    }
+  }
 
   return (
-    <div className={`flex flex-col gap-1 message-enter ${isUser ? "items-end" : "items-start"} ${isUser ? "ml-auto" : ""}`} style={{ maxWidth: "100%" }}>
-      <div
-        className={`px-4 py-3 rounded-2xl text-sm leading-relaxed ${!isUser ? "liquid-glass" : ""}`}
-        style={{
-          background: isUser ? "var(--purple-dim)" : undefined,
-          color: "var(--text-primary)",
-          border: isUser ? "1px solid rgba(168, 85, 247, 0.2)" : undefined,
-          borderRadius: isUser ? "20px 20px 4px 20px" : "4px 20px 20px 20px",
-          maxWidth: "80%",
-          whiteSpace: "pre-wrap",
-        }}
-      >
-        {message.content}
-      </div>
+    <div
+      className={`flex flex-col gap-1 message-enter ${isUser ? "items-end" : "items-start"} ${isUser ? "ml-auto" : ""}`}
+      style={{ maxWidth: "100%" }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      {/* Action buttons — user messages only, shown on hover when not editing/loading */}
+      {isUser && !isEditing && !disabled && (
+        <div
+          className="flex gap-1 px-1"
+          style={{
+            opacity: hovered ? 1 : 0,
+            transition: "opacity 0.15s",
+            pointerEvents: hovered ? "auto" : "none",
+          }}
+        >
+          <button
+            onClick={onEditStart}
+            title="Edit message"
+            className="flex items-center gap-1 rounded-md px-2 py-0.5 text-xs transition-colors"
+            style={{
+              color: "var(--text-muted)",
+              background: "transparent",
+            }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "var(--purple-light)"; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "var(--text-muted)"; }}
+          >
+            &#9998; Edit
+          </button>
+          <button
+            onClick={onRerun}
+            title="Rerun from here"
+            className="flex items-center gap-1 rounded-md px-2 py-0.5 text-xs transition-colors"
+            style={{
+              color: "var(--text-muted)",
+              background: "transparent",
+            }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "var(--purple-light)"; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "var(--text-muted)"; }}
+          >
+            &#8635; Rerun
+          </button>
+        </div>
+      )}
+
+      {isEditing ? (
+        // Inline edit mode
+        <div className="flex flex-col gap-2" style={{ maxWidth: "80%", width: "100%" }}>
+          <textarea
+            autoFocus
+            value={editText}
+            onChange={(e) => onEditChange?.(e.target.value)}
+            onKeyDown={handleEditKeyDown}
+            rows={3}
+            className="resize-none rounded-2xl px-4 py-3 text-sm leading-relaxed outline-none"
+            style={{
+              background: "var(--purple-dim)",
+              color: "var(--text-primary)",
+              border: "1px solid rgba(168, 85, 247, 0.5)",
+              borderRadius: "20px 20px 4px 20px",
+              width: "100%",
+              minHeight: 72,
+            }}
+          />
+          <div className="flex gap-2 justify-end">
+            <button
+              onClick={onEditCancel}
+              className="rounded-lg px-3 py-1 text-xs transition-colors"
+              style={{ color: "var(--text-muted)", background: "rgba(255,255,255,0.05)" }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "var(--text-secondary)"; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "var(--text-muted)"; }}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={onEditSave}
+              disabled={!editText?.trim()}
+              className="rounded-lg px-3 py-1 text-xs font-medium transition-opacity"
+              style={{
+                background: editText?.trim() ? "var(--purple-primary)" : "rgba(255,255,255,0.05)",
+                color: editText?.trim() ? "white" : "var(--text-muted)",
+              }}
+            >
+              Save &amp; Send
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div
+          className={`px-4 py-3 rounded-2xl text-sm leading-relaxed ${!isUser ? "liquid-glass" : ""}`}
+          style={{
+            background: isUser ? "var(--purple-dim)" : undefined,
+            color: "var(--text-primary)",
+            border: isUser ? "1px solid rgba(168, 85, 247, 0.2)" : undefined,
+            borderRadius: isUser ? "20px 20px 4px 20px" : "4px 20px 20px 20px",
+            maxWidth: "80%",
+            whiteSpace: "pre-wrap",
+          }}
+        >
+          {message.content}
+        </div>
+      )}
 
       <div className="text-xs px-1" style={{ color: "var(--text-muted)" }}>
         {formatDateTime(message.createdAt)}
