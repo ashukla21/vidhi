@@ -7,6 +7,7 @@ import {
   getPlanetaryTransits,
   isDataReady,
 } from "@/lib/astro-db";
+import { getBitcoinPrices, isBtcDataReady } from "@/lib/btc-db";
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -47,6 +48,18 @@ Help the user make informed investment decisions by connecting planetary data to
 - Historical precedents: what happened to markets the last time this exact configuration occurred
 - Specific upcoming dates to watch, derived from the dataset
 - Nakshatra-level analysis for more precise timing
+
+## Bitcoin Price Data
+
+You also have access to historical Bitcoin (BTC-USD) daily OHLCV data via the **get_bitcoin_prices** tool. Data spans from **2014-09-17** to the present. Each row contains: date, open, high, low, close (USD), volume, and pct_change (daily % change in close price).
+
+Use this tool to:
+- Retrieve BTC prices for any date range to cross-reference with planetary configurations
+- Identify how Bitcoin moved during specific astrological events (transits, sign changes)
+- Find historical patterns: "What did BTC do the last time Jupiter entered Taurus?"
+- Compute trend context: rising/falling market during a given planetary period
+
+To correlate BTC with astrology, call both tools with matching date ranges and then synthesize the results.
 
 ## Vedic Astrology Principles for Markets
 
@@ -148,6 +161,29 @@ const ASTRO_TOOLS: Anthropic.Tool[] = [
       required: ["start_date", "end_date"],
     },
   },
+  {
+    name: "get_bitcoin_prices",
+    description:
+      "Retrieve historical Bitcoin (BTC-USD) daily OHLCV price data for a date range. Returns date, open, high, low, close (USD), volume, and pct_change (daily % change). Data available from 2014-09-17 to present. Use this alongside astrology tools to correlate planetary configurations with BTC price movements.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        start_date: {
+          type: "string",
+          description: "Start date in YYYY-MM-DD format (earliest available: 2014-09-17)",
+        },
+        end_date: {
+          type: "string",
+          description: "End date in YYYY-MM-DD format",
+        },
+        limit: {
+          type: "number",
+          description: "Maximum rows to return (default 1000, max 3000). For multi-year ranges use a higher limit.",
+        },
+      },
+      required: ["start_date", "end_date"],
+    },
+  },
 ];
 
 // Execute a tool call and return the result as a string
@@ -184,6 +220,18 @@ async function executeTool(
           startDate: toolInput.start_date as string,
           endDate: toolInput.end_date as string,
           planets: toolInput.planets as string[] | undefined,
+        });
+        return JSON.stringify(result);
+      }
+      case "get_bitcoin_prices": {
+        if (!isBtcDataReady()) {
+          return JSON.stringify({ error: "BTC price data not built yet. Run: python3 scripts/download_btc_data.py" });
+        }
+        const limit = Math.min((toolInput.limit as number) || 1000, 3000);
+        const result = getBitcoinPrices({
+          startDate: toolInput.start_date as string,
+          endDate: toolInput.end_date as string,
+          limit,
         });
         return JSON.stringify(result);
       }
