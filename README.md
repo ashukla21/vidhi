@@ -7,6 +7,7 @@ A full-stack AI system for investment analysis using Vedic astrology data (1990�
 - **AI Chat** — Claude claude-sonnet-4-6 with direct access to vedic planetary data via tool use
 - **Saved Threads & Folders** — organize ongoing investment discussions (e.g., "Bitcoin Strategy")
 - **Astro Data Tools** — Claude can query planetary positions, sign transits, and nakshatra data
+- **Bitcoin Price Data** — Claude can fetch historical BTC-USD prices (2014–present) and correlate them with planetary configurations
 - **Dark Purple UI** — RobinHood-inspired aesthetic
 
 ---
@@ -59,7 +60,16 @@ python3 scripts/build_astro_sqlite.py
 
 Reads all CSVs from `data/raw/`, processes them into `data/astro_planet_data.sqlite` — the file Claude queries at runtime. This step takes a few minutes (21M+ rows).
 
-### 6. Run the dev server
+### 6. Download Bitcoin price data
+
+```bash
+pip install yfinance
+python3 scripts/download_btc_data.py
+```
+
+Downloads BTC-USD daily OHLCV data (2014-09-17 → today) into `data/btc_prices.sqlite`. Re-run anytime to refresh with the latest prices.
+
+### 7. Run the dev server
 
 ```bash
 npm run dev
@@ -77,9 +87,10 @@ npm install
 npm run db:generate
 cp .env.example .env          # add ANTHROPIC_API_KEY
 npm run db:migrate
-pip install gdown pandas
+pip install gdown pandas yfinance
 python3 scripts/download_raw_data.py   # download CSVs from Drive (~few GB)
 python3 scripts/build_astro_sqlite.py  # build SQLite from CSVs (~few min)
+python3 scripts/download_btc_data.py   # download BTC price history
 npm run dev
 
 # If you already have data/raw/ with the year folders
@@ -87,8 +98,9 @@ npm install
 npm run db:generate
 cp .env.example .env          # add ANTHROPIC_API_KEY
 npm run db:migrate
-pip install pandas
+pip install pandas yfinance
 python3 scripts/build_astro_sqlite.py  # build SQLite directly
+python3 scripts/download_btc_data.py   # download BTC price history
 npm run dev
 ```
 
@@ -111,18 +123,21 @@ src/
   lib/
     prisma.ts             # Prisma client (SQLite via better-sqlite3)
     astro-db.ts           # Astro data queries (reads astro_planet_data.sqlite)
+    btc-db.ts             # BTC price queries (reads btc_prices.sqlite)
     utils.ts              # Utilities
   types/index.ts          # TypeScript types
 
 scripts/
   download_raw_data.py    # Google Drive → data/raw/ (monthly CSVs)
   build_astro_sqlite.py   # data/raw/ CSVs → data/astro_planet_data.sqlite
+  download_btc_data.py    # Yahoo Finance → data/btc_prices.sqlite (BTC-USD daily OHLCV)
 
 data/
   raw/                        # (gitignored) Year subfolders with monthly CSVs
     1990/ … 2031/
   astro_planet_data.sqlite    # (gitignored) Built by build_astro_sqlite.py
   astro_data_summary.json     # Dataset stats (date range, planets, row count)
+  btc_prices.sqlite           # (gitignored) Built by download_btc_data.py
 
 prisma/
   schema.prisma           # Folder / Thread / Message models
@@ -138,6 +153,7 @@ prisma/
 | `get_planetary_positions` | Daily positions (sign, nakshatra, pada) for any planet and date range |
 | `get_planet_in_sign` | All dates a planet was in a given zodiac sign |
 | `get_planetary_transits` | Sign-change events (when planets move between signs) |
+| `get_bitcoin_prices` | Historical BTC-USD daily OHLCV + % change (2014-09-17 → present) |
 
 ## Example Questions
 
