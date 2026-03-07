@@ -144,17 +144,6 @@ prisma/
   dev.db                  # (gitignored) App database — created by db:migrate
 ```
 
----
-
-## Astrology Tools Available to Claude
-
-| Tool | Description |
-|---|---|
-| `get_planetary_positions` | Daily positions (sign, nakshatra, pada) for any planet and date range |
-| `get_planet_in_sign` | All dates a planet was in a given zodiac sign |
-| `get_planetary_transits` | Sign-change events (when planets move between signs) |
-| `get_bitcoin_prices` | Historical BTC-USD daily OHLCV + % change (2014-09-17 → present) |
-
 ## Example Questions
 
 - "What does Jupiter in Taurus mean for Bitcoin in 2025?"
