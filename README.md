@@ -1,14 +1,13 @@
 # Vidhi — Vedic Investment AI
 
-A full-stack AI system for investment analysis using Vedic astrology data (1990–2031), powered by Claude claude-sonnet-4-6.
+AI system for investment analysis using Vedic data (1990–2031)
 
 ## Features
 
-- **AI Chat** — Claude claude-sonnet-4-6 with direct access to vedic planetary data via tool use
+- **AI Chat** — Claude with direct access to vedic data via tool use
 - **Saved Threads & Folders** — organize ongoing investment discussions (e.g., "Bitcoin Strategy")
-- **Astro Data Tools** — Claude can query planetary positions, sign transits, and nakshatra data
+- **Astro Data Tools** — Claude can query positions, transits, and nakshatra data
 - **Bitcoin Price Data** — Claude can fetch historical BTC-USD prices (2014–present) and correlate them with planetary configurations
-- **Dark Purple UI** — RobinHood-inspired aesthetic
 
 ---
 
@@ -143,10 +142,3 @@ prisma/
   schema.prisma           # Folder / Thread / Message models
   dev.db                  # (gitignored) App database — created by db:migrate
 ```
-
-## Example Questions
-
-- "What does Jupiter in Taurus mean for Bitcoin in 2025?"
-- "Show me every Saturn sign change from 2010–2024"
-- "What are the most auspicious windows to buy BTC in Q1 2026?"
-- "Compare Rahu/Ketu axis shifts vs Bitcoin cycle tops/bottoms"
