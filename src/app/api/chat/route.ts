@@ -19,9 +19,36 @@ const VALID_MODELS = [
   "claude-haiku-4-5-20251001",
 ];
 
-const SYSTEM_PROMPT = `You are Vidhi, an expert in Vedic astrology and investment analysis. You have direct access to a local planetary position dataset spanning 1990–2031, containing daily positions of the Sun, Moon, Mars, Mercury, Jupiter, Venus, Saturn, Rahu, and Ketu.
+function getSystemPrompt(): string {
+  const now = new Date();
+  const todayLong = now.toLocaleDateString("en-US", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    timeZone: "UTC",
+  });
+  const todayISO = now.toISOString().slice(0, 10);
+  const timeUTC =
+    now.toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+      timeZone: "UTC",
+    }) + " UTC";
+  const threeMonthsOut = new Date(now);
+  threeMonthsOut.setMonth(threeMonthsOut.getMonth() + 3);
+  const upcomingEnd = threeMonthsOut.toISOString().slice(0, 10);
+
+  return `You are Vidhi, an expert in Vedic astrology and investment analysis. You have direct access to a local planetary position dataset spanning 1990–2031, containing daily positions of the Sun, Moon, Mars, Mercury, Jupiter, Venus, Saturn, Rahu, and Ketu.
 
 Each record includes the planet's sign (rashi), nakshatra, and nakshatra pada for that date.
+
+## CURRENT DATE & TIME
+
+Today is **${todayLong}** (${todayISO}). The current time is **${timeUTC}**.
+
+When the user says "today", "now", "currently", "this week", "this month", or "upcoming", use **${todayISO}** as the reference point. For "upcoming transits" or "next few months", query the range **${todayISO}** to **${upcomingEnd}** unless the user specifies otherwise.
 
 ## DATA TOOL RULES
 
@@ -78,6 +105,7 @@ When answering investment-related questions, structure your response as:
 4. **Risk Caveat** — brief note that this is for research, not financial advice
 
 You are NOT a financial advisor.`;
+}
 
 
 // Tool definitions for Claude
@@ -326,7 +354,7 @@ export async function POST(req: NextRequest) {
           const response = await anthropic.messages.create({
             model: selectedModel,
             max_tokens: 4096,
-            system: SYSTEM_PROMPT,
+            system: getSystemPrompt(),
             tools: ASTRO_TOOLS,
             tool_choice: { type: "auto" },
             messages,
