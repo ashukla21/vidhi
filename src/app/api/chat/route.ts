@@ -169,9 +169,9 @@ async function executeTool(
           planets: toolInput.planets as string[] | undefined,
           startDate: toolInput.start_date as string,
           endDate: toolInput.end_date as string,
-          limit: (toolInput.limit as number) || 500,
+          limit: Math.min((toolInput.limit as number) || 200, 300),
         });
-        return JSON.stringify(result.slice(0, 1000));
+        return JSON.stringify(result.slice(0, 300));
       }
       case "get_planet_in_sign": {
         const result = await getPlanetInSign({
@@ -180,7 +180,7 @@ async function executeTool(
           startDate: toolInput.start_date as string | undefined,
           endDate: toolInput.end_date as string | undefined,
         });
-        return JSON.stringify(result.slice(0, 1000));
+        return JSON.stringify(result.slice(0, 300));
       }
       case "get_planetary_transits": {
         const result = await getPlanetaryTransits({
@@ -276,7 +276,6 @@ export async function POST(req: NextRequest) {
         let finalText = "";
 
         // Agentic loop — keep going until Claude stops using tools.
-        let isFirstTurn = true;
         // eslint-disable-next-line no-constant-condition
         while (true) {
           const response = await anthropic.messages.create({
@@ -284,10 +283,9 @@ export async function POST(req: NextRequest) {
             max_tokens: 4096,
             system: SYSTEM_PROMPT,
             tools: ASTRO_TOOLS,
-            tool_choice: isFirstTurn ? { type: "any" } : { type: "auto" },
+            tool_choice: { type: "auto" },
             messages,
           });
-          isFirstTurn = false;
 
           // Stream text content
           for (const block of response.content) {
