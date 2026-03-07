@@ -21,21 +21,27 @@ const VALID_MODELS = [
 
 function getSystemPrompt(): string {
   const now = new Date();
+  const TZ = "America/Chicago";
   const todayLong = now.toLocaleDateString("en-US", {
     weekday: "long",
     year: "numeric",
     month: "long",
     day: "numeric",
-    timeZone: "UTC",
+    timeZone: TZ,
   });
-  const todayISO = now.toISOString().slice(0, 10);
-  const timeUTC =
+  // Build ISO date string in CST (YYYY-MM-DD)
+  const todayISO = [
+    now.toLocaleDateString("en-US", { year: "numeric", timeZone: TZ }),
+    now.toLocaleDateString("en-US", { month: "2-digit", timeZone: TZ }),
+    now.toLocaleDateString("en-US", { day: "2-digit", timeZone: TZ }),
+  ].join("-");
+  const timeTZ =
     now.toLocaleTimeString("en-US", {
       hour: "2-digit",
       minute: "2-digit",
       hour12: false,
-      timeZone: "UTC",
-    }) + " UTC";
+      timeZone: TZ,
+    }) + " CST";
   const threeMonthsOut = new Date(now);
   threeMonthsOut.setMonth(threeMonthsOut.getMonth() + 3);
   const upcomingEnd = threeMonthsOut.toISOString().slice(0, 10);
@@ -46,7 +52,7 @@ Each record includes the planet's sign (rashi), nakshatra, and nakshatra pada fo
 
 ## CURRENT DATE & TIME
 
-Today is **${todayLong}** (${todayISO}). The current time is **${timeUTC}**.
+Today is **${todayLong}** (${todayISO}). The current time is **${timeTZ}**.
 
 When the user says "today", "now", "currently", "this week", "this month", or "upcoming", use **${todayISO}** as the reference point. For "upcoming transits" or "next few months", query the range **${todayISO}** to **${upcomingEnd}** unless the user specifies otherwise.
 
