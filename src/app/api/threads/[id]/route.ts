@@ -1,0 +1,44 @@
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  const thread = await prisma.thread.findUnique({
+    where: { id },
+    include: { messages: { orderBy: { createdAt: "asc" } } },
+  });
+  if (!thread) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const parsed = {
+    ...thread,
+    messages: thread.messages.map((m) => ({
+      ...m,
+      toolCalls: typeof m.toolCalls === "string" ? JSON.parse(m.toolCalls) : m.toolCalls,
+    })),
+  };
+  return NextResponse.json(parsed);
+}
+
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  const { title, folderId } = await req.json();
+  const thread = await prisma.thread.update({
+    where: { id },
+    data: { ...(title !== undefined && { title }), ...(folderId !== undefined && { folderId }) },
+  });
+  return NextResponse.json(thread);
+}
+
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  await prisma.thread.delete({ where: { id } });
+  return NextResponse.json({ success: true });
+}

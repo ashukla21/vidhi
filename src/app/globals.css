@@ -1,0 +1,521 @@
+@import "tailwindcss";
+
+:root {
+  /* Greyish-black theme */
+  --bg-primary: #0d0d0d;
+  --bg-secondary: #141414;
+  --bg-tertiary: #1c1c1c;
+  --bg-card: #181818;
+  --bg-hover: #222222;
+
+  /* Purple neon accents */
+  --purple-primary: #a855f7;
+  --purple-light: #c084fc;
+  --purple-dim: #6b21a8;
+  --purple-neon: #bf5af2;
+  --purple-glow: rgba(168, 85, 247, 0.15);
+
+  /* Soft white text + muted */
+  --text-primary: #e8e8e8;
+  --text-secondary: #999999;
+  --text-muted: #666666;
+  --text-accent: #d8b4fe;
+
+  --border-subtle: #2a2a2a;
+  --border-active: #a855f7;
+
+  --green: #00d4a0;
+  --red: #ff4d6a;
+  --gold: #f5c842;
+
+  --background: var(--bg-primary);
+  --foreground: var(--text-primary);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Monospace only for code blocks */
+code, pre, kbd, samp {
+  font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', 'Menlo', 'Courier New', monospace;
+  font-size: 0.875em;
+  letter-spacing: 0;
+}
+
+/* Smooth scrolling for all scrollable areas */
+* {
+  scroll-behavior: smooth;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-subtle);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--purple-dim);
+}
+
+/* Purple glow utility */
+.glow-purple {
+  box-shadow: 0 0 20px var(--purple-glow), 0 0 60px rgba(168, 85, 247, 0.05);
+}
+
+/* Gradient text for titles — purple neon */
+.gradient-text {
+  background: linear-gradient(135deg, var(--purple-neon), var(--purple-light));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ── Twinkling Star Loading Animation ────────────────────────────── */
+@keyframes twinkle {
+  0%, 100% {
+    opacity: 0.4;
+    transform: scale(0.8) rotate(0deg);
+    filter: drop-shadow(0 0 4px var(--purple-neon));
+  }
+  25% {
+    opacity: 0.9;
+    transform: scale(1.1) rotate(90deg);
+    filter: drop-shadow(0 0 10px var(--purple-neon));
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.3) rotate(180deg);
+    filter: drop-shadow(0 0 16px var(--purple-neon));
+  }
+  75% {
+    opacity: 0.7;
+    transform: scale(1) rotate(270deg);
+    filter: drop-shadow(0 0 8px var(--purple-neon));
+  }
+}
+
+@keyframes loading-text-fade {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+.twinkling-star {
+  display: inline-block;
+  animation: twinkle 2s ease-in-out infinite;
+  color: var(--purple-neon);
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.loading-text {
+  animation: loading-text-fade 2s ease-in-out infinite;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  letter-spacing: 0.02em;
+}
+
+/* ── Apple Liquid Glass Effect ───────────────────────────────────── */
+.liquid-glass {
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.liquid-glass:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.12);
+  transform: translateY(-1px);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.liquid-glass:active {
+  transform: translateY(0px) scale(0.99);
+  transition-duration: 0.1s;
+}
+
+/* Liquid glass for buttons */
+.liquid-glass-btn {
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  background: rgba(168, 85, 247, 0.15);
+  border: 1px solid rgba(168, 85, 247, 0.2);
+  transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.liquid-glass-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.08) 0%,
+    transparent 50%,
+    rgba(255, 255, 255, 0.02) 100%
+  );
+  opacity: 0;
+  transition: opacity 0.35s ease;
+}
+
+.liquid-glass-btn:hover {
+  background: rgba(168, 85, 247, 0.25);
+  border-color: rgba(168, 85, 247, 0.4);
+  transform: translateY(-1px) scale(1.02);
+  box-shadow:
+    0 4px 20px rgba(168, 85, 247, 0.2),
+    0 0 40px rgba(168, 85, 247, 0.08);
+}
+
+.liquid-glass-btn:hover::before {
+  opacity: 1;
+}
+
+.liquid-glass-btn:active {
+  transform: translateY(0px) scale(0.98);
+  transition-duration: 0.1s;
+}
+
+/* Liquid glass for sidebar items */
+.liquid-glass-item {
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  border: 1px solid transparent;
+}
+
+.liquid-glass-item:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(8px);
+  transform: translateX(2px);
+}
+
+/* Liquid glass for cards */
+.liquid-glass-card {
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.liquid-glass-card:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(168, 85, 247, 0.2);
+  transform: translateY(-2px);
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.3),
+    0 0 60px rgba(168, 85, 247, 0.06);
+}
+
+/* Smooth selection highlight */
+::selection {
+  background: rgba(168, 85, 247, 0.3);
+  color: var(--text-primary);
+}
+
+/* Model selector dropdown glass */
+.model-select {
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  appearance: none;
+  cursor: pointer;
+}
+
+.model-select:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(168, 85, 247, 0.3);
+}
+
+.model-select:focus {
+  outline: none;
+  border-color: var(--purple-primary);
+  box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.15);
+}
+
+/* Attachment chip */
+.attachment-chip {
+  backdrop-filter: blur(12px);
+  background: rgba(168, 85, 247, 0.1);
+  border: 1px solid rgba(168, 85, 247, 0.2);
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.attachment-chip:hover {
+  background: rgba(168, 85, 247, 0.18);
+  transform: scale(1.03);
+}
+
+/* Attachment button hover highlight */
+.attach-btn {
+  position: relative;
+  border-radius: 8px;
+  transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  color: var(--text-muted);
+}
+
+.attach-btn:hover {
+  color: var(--purple-light);
+  background: rgba(168, 85, 247, 0.12);
+  box-shadow:
+    0 0 12px rgba(168, 85, 247, 0.2),
+    inset 0 0 8px rgba(168, 85, 247, 0.05);
+  transform: scale(1.1);
+}
+
+.attach-btn:active {
+  transform: scale(0.95);
+}
+
+/* Tooltip for attach button */
+.attach-btn::after {
+  content: 'Attach file';
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  background: rgba(30, 30, 30, 0.95);
+  backdrop-filter: blur(12px);
+  color: var(--text-secondary);
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.attach-btn:hover::after {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* ── Frutiger Aero — Vidhi title animation ───────────────────────── */
+@keyframes frutiger-aero {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes aero-shimmer {
+  0%   { opacity: 0; transform: translateX(-100%) skewX(-20deg); }
+  40%  { opacity: 0.6; }
+  100% { opacity: 0; transform: translateX(300%) skewX(-20deg); }
+}
+
+.vidhi-aero {
+  font-family: 'Cinzel', 'Trajan Pro', Georgia, serif;
+  font-weight: 900;
+  background: linear-gradient(
+    135deg,
+    #9333ea 0%,
+    #b07ee8 18%,
+    #d4aaee 30%,
+    #8bb8d4 42%,
+    #6366f1 55%,
+    #c45fd4 68%,
+    #a066d4 80%,
+    #9333ea 100%
+  );
+  background-size: 300% 300%;
+  animation: frutiger-aero 5s ease infinite;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  position: relative;
+  display: inline-block;
+  filter: drop-shadow(0 0 12px rgba(147, 51, 234, 0.2));
+}
+
+/* Sidebar Vidhi — smaller version, still Cinzel */
+.vidhi-sidebar {
+  font-family: 'Cinzel', Georgia, serif;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--purple-neon), var(--purple-light));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  cursor: pointer;
+  transition: filter 0.3s ease;
+}
+
+.vidhi-sidebar:hover {
+  filter: drop-shadow(0 0 8px rgba(191, 90, 242, 0.5));
+}
+
+/* Three-dot thread menu button */
+.thread-dots {
+  transition: opacity 0.2s ease, background 0.2s ease, color 0.2s ease;
+}
+
+.thread-dots:hover {
+  color: var(--purple-light) !important;
+  background: rgba(168, 85, 247, 0.12) !important;
+  opacity: 1 !important;
+}
+
+/* ── Send button glow ────────────────────────────────────────────── */
+.send-btn {
+  transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+}
+
+.send-btn:hover:not(:disabled) {
+  box-shadow:
+    0 0 14px rgba(168, 85, 247, 0.5),
+    0 0 28px rgba(168, 85, 247, 0.2),
+    inset 0 0 8px rgba(255, 255, 255, 0.1) !important;
+  transform: scale(1.1);
+}
+
+.send-btn:active:not(:disabled) {
+  transform: scale(0.93);
+}
+
+/* ── Message entrance animation (iOS-style bounce) ───────────────── */
+@keyframes msg-pop-in {
+  0%   { opacity: 0; transform: translateY(10px) scale(0.95); }
+  55%  { opacity: 1; transform: translateY(-3px) scale(1.02); }
+  75%  { transform: translateY(1px) scale(0.99); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.message-enter {
+  animation: msg-pop-in 0.38s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+
+/* ── Smooth sidebar with materialise/dematerialise ───────────────── */
+.sidebar-panel {
+  transition:
+    width 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+    min-width 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+}
+
+/* Content fades in/out — no blur (GPU-expensive), pure opacity + translate */
+.sidebar-content {
+  transition:
+    opacity 0.15s ease,
+    transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ── View transition (chat ↔ home) ───────────────────────────────── */
+@keyframes view-materialise {
+  0%   { opacity: 0; transform: translateY(6px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+.view-enter {
+  animation: view-materialise 0.18s cubic-bezier(0.25, 0, 0.25, 1) both;
+}
+
+/* ── Aurora / fluorescent bg on welcome screen ───────────────────── */
+.aurora-bg {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.aurora-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(90px);
+}
+
+.aurora-1 {
+  width: 55vw;
+  height: 40vh;
+  background: radial-gradient(ellipse, rgba(168, 85, 247, 0.18), transparent 70%);
+  top: 10%;
+  left: 20%;
+  animation: aurora-drift-a 22s ease-in-out infinite;
+}
+
+.aurora-2 {
+  width: 40vw;
+  height: 35vh;
+  background: radial-gradient(ellipse, rgba(6, 182, 212, 0.1), transparent 70%);
+  top: 45%;
+  left: 55%;
+  animation: aurora-drift-b 28s ease-in-out infinite;
+}
+
+.aurora-3 {
+  width: 35vw;
+  height: 30vh;
+  background: radial-gradient(ellipse, rgba(232, 121, 249, 0.1), transparent 70%);
+  top: 60%;
+  left: 5%;
+  animation: aurora-drift-c 19s ease-in-out infinite;
+}
+
+/* Fine pixel grid for the "digital" texture */
+.aurora-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(168, 85, 247, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(168, 85, 247, 0.025) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+@keyframes aurora-drift-a {
+  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.7; }
+  30%       { transform: translate(5vw, 4vh) scale(1.08); opacity: 1; }
+  60%       { transform: translate(-4vw, -3vh) scale(0.94); opacity: 0.6; }
+}
+
+@keyframes aurora-drift-b {
+  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.6; }
+  40%       { transform: translate(-6vw, 5vh) scale(1.1); opacity: 0.9; }
+  70%       { transform: translate(4vw, -4vh) scale(0.95); opacity: 0.5; }
+}
+
+@keyframes aurora-drift-c {
+  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.5; }
+  35%       { transform: translate(5vw, -4vh) scale(1.06); opacity: 0.8; }
+  65%       { transform: translate(-3vw, 3vh) scale(0.96); opacity: 0.4; }
+}
