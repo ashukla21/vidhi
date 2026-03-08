@@ -24,7 +24,20 @@ TABLE_NAME  = "btc_prices"
 SYMBOL      = "BTC-USD"
 
 
-def download() -> "pd.DataFrame":
+def get_latest_date_in_db() -> str | None:
+    """Return the most recent date already stored in the DB, or None if DB doesn't exist."""
+    if not SQLITE_PATH.exists():
+        return None
+    try:
+        conn = sqlite3.connect(SQLITE_PATH)
+        row = conn.execute(f"SELECT MAX(date) FROM {TABLE_NAME}").fetchone()
+        conn.close()
+        return row[0] if row and row[0] else None
+    except Exception:
+        return None
+
+
+def download(start_date: str | None = None) -> "pd.DataFrame":
     try:
         import yfinance as yf
     except ImportError:
@@ -33,13 +46,18 @@ def download() -> "pd.DataFrame":
 
     import pandas as pd
 
-    print(f"Downloading {SYMBOL} history from Yahoo Finance...")
-    ticker = yf.Ticker(SYMBOL)
-    df = ticker.history(period="max", interval="1d", auto_adjust=True)
+    if start_date:
+        print(f"Downloading {SYMBOL} from {start_date} → today (incremental)...")
+        ticker = yf.Ticker(SYMBOL)
+        df = ticker.history(start=start_date, interval="1d", auto_adjust=True)
+    else:
+        print(f"Downloading {SYMBOL} full history from Yahoo Finance...")
+        ticker = yf.Ticker(SYMBOL)
+        df = ticker.history(period="max", interval="1d", auto_adjust=True)
 
     if df.empty:
-        print("ERROR: No data returned from Yahoo Finance.")
-        sys.exit(1)
+        print("No new data returned from Yahoo Finance.")
+        return pd.DataFrame()
 
     # Normalize
     df = df.reset_index()
@@ -72,27 +90,67 @@ def download() -> "pd.DataFrame":
     return df
 
 
-def save(df: "pd.DataFrame"):
-    DATA_DIR.mkdir(exist_ok=True)
-
-    if SQLITE_PATH.exists():
-        SQLITE_PATH.unlink()
-        print(f"Removed old DB: {SQLITE_PATH}")
-
-    conn = sqlite3.connect(SQLITE_PATH)
-    df.to_sql(TABLE_NAME, conn, if_exists="replace", index=False)
-
-    cur = conn.cursor()
-    cur.execute(f"CREATE UNIQUE INDEX IF NOT EXISTS idx_date ON {TABLE_NAME}(date)")
+def ensure_table(conn: sqlite3.Connection):
+    conn.execute(f"""
+        CREATE TABLE IF NOT EXISTS {TABLE_NAME} (
+            date       TEXT PRIMARY KEY,
+            open       REAL,
+            high       REAL,
+            low        REAL,
+            close      REAL,
+            volume     REAL,
+            pct_change REAL
+        )
+    """)
+    conn.execute(f"CREATE UNIQUE INDEX IF NOT EXISTS idx_date ON {TABLE_NAME}(date)")
     conn.commit()
+
+
+def save(df: "pd.DataFrame"):
+    import pandas as pd
+
+    DATA_DIR.mkdir(exist_ok=True)
+    conn = sqlite3.connect(SQLITE_PATH)
+    ensure_table(conn)
+
+    # Upsert — preserve any rows already imported from the Numbers file
+    records = df.to_dict(orient="records")
+    conn.executemany(f"""
+        INSERT INTO {TABLE_NAME} (date, open, high, low, close, volume, pct_change)
+        VALUES (:date, :open, :high, :low, :close, :volume, :pct_change)
+        ON CONFLICT(date) DO UPDATE SET
+            open       = excluded.open,
+            high       = excluded.high,
+            low        = excluded.low,
+            close      = excluded.close,
+            volume     = excluded.volume,
+            pct_change = excluded.pct_change
+    """, records)
+    conn.commit()
+
+    total = conn.execute(f"SELECT COUNT(*) FROM {TABLE_NAME}").fetchone()[0]
     conn.close()
 
     size_kb = SQLITE_PATH.stat().st_size / 1_000
-    print(f"Saved: {SQLITE_PATH} ({size_kb:.0f} KB)")
+    print(f"Saved: {SQLITE_PATH} ({size_kb:.0f} KB)  |  Total rows in DB: {total:,}")
 
 
 def main():
-    df = download()
+    latest = get_latest_date_in_db()
+    if latest:
+        print(f"Existing DB found. Latest date: {latest}")
+        # Fetch from one day after the latest stored date
+        import pandas as pd
+        from datetime import date, timedelta
+        next_day = (pd.to_datetime(latest) + timedelta(days=1)).strftime("%Y-%m-%d")
+        df = download(start_date=next_day)
+    else:
+        df = download()
+
+    if df.empty:
+        print("DB is already up to date.")
+        return
+
     save(df)
     print("Done.")
 
