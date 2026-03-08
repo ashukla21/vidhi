@@ -70,19 +70,27 @@ def parse_pct(val: str) -> float | None:
 def parse_date(val: str) -> str | None:
     """
     Accepts multiple date formats and normalises to YYYY-MM-DD.
-      03/24/2024  →  2024-03-24
-      2024-03-24  →  2024-03-24  (already correct)
-      Mar 24, 2024 → 2024-03-24
+      03/24/2024      →  2024-03-24
+      2024-03-24      →  2024-03-24
+      Mar 24, 2024    →  2024-03-24
+      1643673600      →  2022-02-01  (Unix timestamp)
+      2024-03-24T...  →  2024-03-24  (ISO 8601)
     """
     v = str(val).strip()
+    # Unix timestamp (10 or 13 digits)
+    m = re.match(r"^(\d{10})(\d{3})?$", v)
+    if m:
+        import datetime
+        ts = int(m.group(1))
+        return datetime.datetime.utcfromtimestamp(ts).strftime("%Y-%m-%d")
     # MM/DD/YYYY
     m = re.match(r"^(\d{1,2})/(\d{1,2})/(\d{4})$", v)
     if m:
         return f"{m.group(3)}-{int(m.group(1)):02d}-{int(m.group(2)):02d}"
-    # YYYY-MM-DD
-    m = re.match(r"^(\d{4})-(\d{2})-(\d{2})$", v)
+    # YYYY-MM-DD (optionally with time)
+    m = re.match(r"^(\d{4})-(\d{2})-(\d{2})", v)
     if m:
-        return v
+        return f"{m.group(1)}-{m.group(2)}-{m.group(3)}"
     # Try pandas as a fallback for other formats
     try:
         import pandas as pd
@@ -140,19 +148,42 @@ def read_numbers(path: Path) -> list[dict]:
 
 # Maps known header names (lowercase, stripped) → our internal key
 COLUMN_MAP = {
-    "date":      "date",
-    "price":     "close",   # "Price" in Investing.com export = closing price
-    "close":     "close",
-    "open":      "open",
-    "high":      "high",
-    "low":       "low",
-    "vol.":      "volume",
-    "vol":       "volume",
-    "volume":    "volume",
-    "change %":  "pct_change",
-    "change%":   "pct_change",
-    "chg%":      "pct_change",
-    "% change":  "pct_change",
+    # Date variants
+    "date":           "date",
+    "timestamp":      "date",
+    "time":           "date",
+    "datetime":       "date",
+    "dt":             "date",
+    "snapped_at":     "date",   # CoinGecko
+    # Price / close variants
+    "price":          "close",  # Investing.com "Price" = closing price
+    "close":          "close",
+    "close price":    "close",
+    "closing price":  "close",
+    "adj close":      "close",  # Yahoo Finance adjusted close (fallback)
+    "last":           "close",
+    # Open
+    "open":           "open",
+    "open price":     "open",
+    # High / Low
+    "high":           "high",
+    "high price":     "high",
+    "low":            "low",
+    "low price":      "low",
+    # Volume variants
+    "vol.":           "volume",
+    "vol":            "volume",
+    "volume":         "volume",
+    "volume (btc)":   "volume",
+    "volume btc":     "volume",
+    "volume usd":     "volume",
+    "volumefrom":     "volume",  # CryptoCompare
+    "volumeto":       "volume",
+    # % change
+    "change %":       "pct_change",
+    "change%":        "pct_change",
+    "chg%":           "pct_change",
+    "% change":       "pct_change",
 }
 
 
@@ -247,6 +278,13 @@ def main():
         sys.exit(1)
 
     print(f"Read {len(raw_rows):,} raw rows")
+
+    # Show detected columns so mismatches are obvious
+    if raw_rows:
+        detected = list(raw_rows[0].keys())
+        mapped = [k for k in detected if k.strip().lower() in COLUMN_MAP]
+        print(f"Detected columns: {detected}")
+        print(f"Recognised columns: {mapped}")
 
     # Normalise
     good, skipped = [], 0
