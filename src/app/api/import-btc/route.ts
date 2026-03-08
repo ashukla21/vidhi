@@ -1,9 +1,10 @@
 import { NextRequest } from "next/server";
-import { writeFile, mkdir, unlink } from "fs/promises";
+import { writeFile, unlink } from "fs/promises";
 import { existsSync } from "fs";
 import { spawn } from "child_process";
 import path from "path";
 import os from "os";
+import { invalidateBtcDb } from "@/lib/btc-db";
 
 export const maxDuration = 120; // allow up to 2 min for large imports
 
@@ -61,6 +62,9 @@ export async function POST(req: NextRequest) {
         { status: 500 }
       );
     }
+
+    // Invalidate the cached DB connection so new data is picked up immediately
+    invalidateBtcDb();
 
     return Response.json({ success: true, output: stdout });
   } catch (err) {

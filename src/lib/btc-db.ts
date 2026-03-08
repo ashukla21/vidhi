@@ -5,14 +5,22 @@ const SQLITE_PATH = path.join(process.cwd(), "data", "btc_prices.sqlite");
 
 type SQLiteDB = import("better-sqlite3").Database;
 let db: SQLiteDB | null = null;
+let dbPath: string | null = null;
 
 function getDb(): SQLiteDB {
-  if (!db) {
+  if (!db || dbPath !== SQLITE_PATH) {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const Database = require("better-sqlite3");
     db = new Database(SQLITE_PATH, { readonly: true }) as SQLiteDB;
+    dbPath = SQLITE_PATH;
   }
   return db;
+}
+
+export function invalidateBtcDb(): void {
+  try { db?.close(); } catch { /* ignore */ }
+  db = null;
+  dbPath = null;
 }
 
 export function isBtcDataReady(): boolean {
@@ -48,3 +56,17 @@ export function getBitcoinPrices(params: {
   `;
   return querySync(sql, [startDate, endDate, limit]);
 }
+
+export function getBtcDateRange(): { earliest: string; latest: string } | null {
+  if (!isBtcDataReady()) return null;
+  try {
+    const row = querySync(
+      "SELECT MIN(date) as earliest, MAX(date) as latest FROM btc_prices"
+    )[0];
+    if (!row?.earliest) return null;
+    return { earliest: row.earliest as string, latest: row.latest as string };
+  } catch {
+    return null;
+  }
+}
+

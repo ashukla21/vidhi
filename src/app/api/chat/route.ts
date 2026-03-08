@@ -7,7 +7,7 @@ import {
   getPlanetaryTransits,
   isDataReady,
 } from "@/lib/astro-db";
-import { getBitcoinPrices, isBtcDataReady } from "@/lib/btc-db";
+import { getBitcoinPrices, isBtcDataReady, getBtcDateRange } from "@/lib/btc-db";
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -84,7 +84,7 @@ Help the user make informed investment decisions by connecting planetary data to
 
 ## Bitcoin Price Data
 
-You also have access to historical Bitcoin (BTC-USD) daily OHLCV data via the **get_bitcoin_prices** tool. Data spans from **2014-09-17** to the present. Each row contains: date, open, high, low, close (USD), volume, and pct_change (daily % change in close price).
+You also have access to historical Bitcoin (BTC-USD) daily OHLCV data via the **get_bitcoin_prices** tool. ${((): string => { const r = getBtcDateRange(); return r ? `Data spans from **${r.earliest}** to **${r.latest}**.` : "No BTC data loaded yet."; })()} Each row contains: date, open, high, low, close (USD), volume, and pct_change (daily % change in close price).
 
 Use this tool to:
 - Retrieve BTC prices for any date range to cross-reference with planetary configurations
@@ -114,8 +114,16 @@ You are NOT a financial advisor.`;
 }
 
 
-// Tool definitions for Claude
-const ASTRO_TOOLS: Anthropic.Tool[] = [
+// Tool definitions for Claude — built lazily so BTC date range is current
+function buildTools(): Anthropic.Tool[] {
+  const btcRange = getBtcDateRange();
+  const btcEarliest = btcRange?.earliest ?? "unknown";
+  const btcLatest = btcRange?.latest ?? "present";
+  return buildToolList(btcEarliest, btcLatest);
+}
+
+function buildToolList(btcEarliest: string, btcLatest: string): Anthropic.Tool[] {
+  return [
   {
     name: "get_planetary_positions",
     description:
@@ -198,13 +206,13 @@ const ASTRO_TOOLS: Anthropic.Tool[] = [
   {
     name: "get_bitcoin_prices",
     description:
-      "Retrieve historical Bitcoin (BTC-USD) daily OHLCV price data for a date range. Returns date, open, high, low, close (USD), volume, and pct_change (daily % change). Data available from 2014-09-17 to present. Use this alongside astrology tools to correlate planetary configurations with BTC price movements.",
+      `Retrieve historical Bitcoin (BTC-USD) daily OHLCV price data for a date range. Returns date, open, high, low, close (USD), volume, and pct_change (daily % change). Data available from ${btcEarliest} to ${btcLatest}. Use this alongside astrology tools to correlate planetary configurations with BTC price movements.`,
     input_schema: {
       type: "object" as const,
       properties: {
         start_date: {
           type: "string",
-          description: "Start date in YYYY-MM-DD format (earliest available: 2014-09-17)",
+          description: `Start date in YYYY-MM-DD format (earliest available: ${btcEarliest})`,
         },
         end_date: {
           type: "string",
@@ -218,7 +226,8 @@ const ASTRO_TOOLS: Anthropic.Tool[] = [
       required: ["start_date", "end_date"],
     },
   },
-];
+  ];
+}
 
 // Hard cap on tool result size to prevent context overflow (~40k chars ≈ 10k tokens)
 const MAX_TOOL_RESULT_CHARS = 40_000;
@@ -380,7 +389,7 @@ export async function POST(req: NextRequest) {
             model: selectedModel,
             max_tokens: 4096,
             system: getSystemPrompt(),
-            tools: ASTRO_TOOLS,
+            tools: buildTools(),
             tool_choice: { type: "auto" },
             messages,
           });
