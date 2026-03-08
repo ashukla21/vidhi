@@ -306,11 +306,19 @@ export async function POST(req: NextRequest) {
     orderBy: { createdAt: "asc" },
   });
 
+  // Apply a rolling window: keep first message (for context) + last N messages.
+  // This prevents unbounded context growth hitting the 200k token limit.
+  const MAX_HISTORY = 20;
+  const windowedMessages =
+    dbMessages.length > MAX_HISTORY
+      ? [dbMessages[0], ...dbMessages.slice(-MAX_HISTORY + 1)]
+      : dbMessages;
+
   // Build conversation messages — all historical messages are text-only,
   // only the current (last) user message may include attachments.
-  const conversationMessages: Anthropic.MessageParam[] = dbMessages.map((m, idx) => {
+  const conversationMessages: Anthropic.MessageParam[] = windowedMessages.map((m, idx) => {
     // For the last user message, include any attachments
-    if (idx === dbMessages.length - 1 && m.role === "user" && attachments?.length) {
+    if (idx === windowedMessages.length - 1 && m.role === "user" && attachments?.length) {
       const contentBlocks: Anthropic.ContentBlockParam[] = [];
 
       for (const att of attachments as Attachment[]) {
