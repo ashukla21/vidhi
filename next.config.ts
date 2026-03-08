@@ -6,6 +6,11 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: path.resolve(__dirname),
   },
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "200mb",
+    },
+  },
 };
 
 export default nextConfig;

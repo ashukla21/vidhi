@@ -7,6 +7,7 @@ import os from "os";
 import { invalidateBtcDb } from "@/lib/btc-db";
 
 export const maxDuration = 120; // allow up to 2 min for large imports
+export const dynamic = "force-dynamic";
 
 function runScript(scriptPath: string, filePath: string): Promise<{ stdout: string; stderr: string; code: number }> {
   return new Promise((resolve) => {
