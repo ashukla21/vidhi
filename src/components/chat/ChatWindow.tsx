@@ -314,7 +314,7 @@ export default function ChatWindow({
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto py-4">
-        <div className="max-w-3xl mx-auto px-6 space-y-4">
+        <div className="max-w-5xl mx-auto px-6 space-y-4">
         {messages.length === 0 && !streaming && (
           <div className="text-center py-16" style={{ color: "var(--text-muted)" }}>
             <div className="text-3xl mb-3 twinkling-star">&#10022;</div>
@@ -353,8 +353,9 @@ export default function ChatWindow({
                   background: "var(--bg-card)",
                   color: "var(--text-primary)",
                   border: "1px solid var(--border-subtle)",
-                  maxWidth: "80%",
+                  maxWidth: "100%",
                   whiteSpace: "pre-wrap",
+                  overflowX: "auto",
                 }}
               >
                 {streaming.text}
@@ -376,7 +377,7 @@ export default function ChatWindow({
         className="shrink-0 pb-4 pt-2"
         style={{ borderTop: "1px solid var(--border-subtle)" }}
       >
-      <div className="max-w-3xl mx-auto px-6">
+      <div className="max-w-5xl mx-auto px-6">
         {/* Attachment previews */}
         {attachments.length > 0 && (
           <div className="flex flex-wrap gap-2 mb-2">
@@ -597,8 +598,9 @@ function MessageBubble({
             color: "var(--text-primary)",
             border: isUser ? "1px solid rgba(168, 85, 247, 0.2)" : undefined,
             borderRadius: isUser ? "20px 20px 4px 20px" : "4px 20px 20px 20px",
-            maxWidth: "80%",
+            maxWidth: isUser ? "80%" : "100%",
             whiteSpace: "pre-wrap",
+            overflowX: isUser ? undefined : "auto",
           }}
         >
           {message.content}
