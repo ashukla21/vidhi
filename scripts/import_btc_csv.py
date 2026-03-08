@@ -107,10 +107,10 @@ def read_numbers(path: Path) -> list[dict]:
     try:
         from numbers_parser import Document
     except ImportError:
-        print("ERROR: numbers-parser not installed.")
-        print("       Run: pip install numbers-parser")
-        print("       Or export the file as CSV from Numbers (File > Export To > CSV)")
-        sys.exit(1)
+        print("numbers-parser not found — installing automatically…")
+        import subprocess
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "numbers-parser", "-q"])
+        from numbers_parser import Document
 
     doc = Document(str(path))
     # Use the first sheet / first table
