@@ -220,6 +220,15 @@ const ASTRO_TOOLS: Anthropic.Tool[] = [
   },
 ];
 
+// Hard cap on tool result size to prevent context overflow (~40k chars ≈ 10k tokens)
+const MAX_TOOL_RESULT_CHARS = 40_000;
+
+function truncateToolResult(json: string): string {
+  if (json.length <= MAX_TOOL_RESULT_CHARS) return json;
+  // Truncate the JSON and append a note so Claude knows data was cut
+  return json.slice(0, MAX_TOOL_RESULT_CHARS) + `\n... [truncated — ${json.length} chars total, showing first ${MAX_TOOL_RESULT_CHARS}. Use a narrower date range or smaller limit to get complete data.]`;
+}
+
 // Execute a tool call and return the result as a string
 async function executeTool(
   toolName: string,
@@ -238,7 +247,7 @@ async function executeTool(
           endDate: toolInput.end_date as string,
           limit: Math.min((toolInput.limit as number) || 200, 300),
         });
-        return JSON.stringify(result.slice(0, 300));
+        return truncateToolResult(JSON.stringify(result.slice(0, 300)));
       }
       case "get_planet_in_sign": {
         const result = await getPlanetInSign({
@@ -247,7 +256,7 @@ async function executeTool(
           startDate: toolInput.start_date as string | undefined,
           endDate: toolInput.end_date as string | undefined,
         });
-        return JSON.stringify(result.slice(0, 300));
+        return truncateToolResult(JSON.stringify(result.slice(0, 300)));
       }
       case "get_planetary_transits": {
         const result = await getPlanetaryTransits({
@@ -255,19 +264,19 @@ async function executeTool(
           endDate: toolInput.end_date as string,
           planets: toolInput.planets as string[] | undefined,
         });
-        return JSON.stringify(result);
+        return truncateToolResult(JSON.stringify(result));
       }
       case "get_bitcoin_prices": {
         if (!isBtcDataReady()) {
           return JSON.stringify({ error: "BTC price data not built yet. Run: python3 scripts/download_btc_data.py" });
         }
-        const limit = Math.min((toolInput.limit as number) || 1000, 3000);
+        const limit = Math.min((toolInput.limit as number) || 500, 500);
         const result = getBitcoinPrices({
           startDate: toolInput.start_date as string,
           endDate: toolInput.end_date as string,
           limit,
         });
-        return JSON.stringify(result);
+        return truncateToolResult(JSON.stringify(result));
       }
       default:
         return JSON.stringify({ error: `Unknown tool: ${toolName}` });
@@ -361,6 +370,8 @@ export async function POST(req: NextRequest) {
       try {
         let messages = [...conversationMessages];
         let finalText = "";
+        let toolRounds = 0;
+        const MAX_TOOL_ROUNDS = 6;
 
         // Agentic loop — keep going until Claude stops using tools.
         // eslint-disable-next-line no-constant-condition
@@ -387,7 +398,8 @@ export async function POST(req: NextRequest) {
 
           if (response.stop_reason === "end_turn") break;
 
-          if (response.stop_reason === "tool_use") {
+          if (response.stop_reason === "tool_use" && toolRounds < MAX_TOOL_ROUNDS) {
+            toolRounds++;
             const toolResults: Anthropic.ToolResultBlockParam[] = [];
 
             for (const block of response.content) {
