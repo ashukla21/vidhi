@@ -9,6 +9,7 @@ import {
 } from "@/lib/astro-db";
 import { getBitcoinPrices, isBtcDataReady, getBtcDateRange } from "@/lib/btc-db";
 import { getNaturalGasPrices, isNgDataReady, getNgDateRange } from "@/lib/ng-db";
+import { getSilverPrices, isSilverDataReady, getSilverDateRange } from "@/lib/silver-db";
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -104,6 +105,15 @@ ${((): string => {
     : `Natural Gas price data is not loaded yet. The user can upload a CSV via the sidebar **"Import Nat Gas Data"** button.`;
 })()}
 
+## Silver Price Data
+
+${((): string => {
+  const r = getSilverDateRange();
+  return r
+    ? `You also have access to Silver futures price data via the **get_silver_prices** tool. Data spans from **${r.earliest}** to **${r.latest}**. Each row contains: date, open, high, low, close (price in USD per troy ounce), volume, and pct_change.\n\nUse this tool to cross-reference Silver price movements with Vedic planetary transits. Silver is particularly sensitive to Venus and Moon transits in Vedic astrology.`
+    : `Silver price data is not loaded yet. The user can upload a CSV via the sidebar **"Import Silver Data"** button.`;
+})()}
+
 ## Vedic Astrology Principles for Markets
 
 - Jupiter transits into new signs often correlate with bull markets (especially Sagittarius, Pisces)
@@ -132,12 +142,16 @@ function buildTools(): Anthropic.Tool[] {
   const ngRange  = getNgDateRange();
   const ngEarliest  = ngRange?.earliest  ?? "unknown";
   const ngLatest    = ngRange?.latest    ?? "present";
-  return buildToolList(btcEarliest, btcLatest, ngEarliest, ngLatest);
+  const silverRange = getSilverDateRange();
+  const silverEarliest = silverRange?.earliest ?? "unknown";
+  const silverLatest   = silverRange?.latest   ?? "present";
+  return buildToolList(btcEarliest, btcLatest, ngEarliest, ngLatest, silverEarliest, silverLatest);
 }
 
 function buildToolList(
   btcEarliest: string, btcLatest: string,
   ngEarliest: string,  ngLatest: string,
+  silverEarliest: string, silverLatest: string,
 ): Anthropic.Tool[] {
   return [
   {
@@ -265,6 +279,29 @@ function buildToolList(
       required: ["start_date", "end_date"],
     },
   },
+  {
+    name: "get_silver_prices",
+    description:
+      `Retrieve historical Silver futures price data. Returns date, open, high, low, close (USD per troy ounce), volume, and pct_change. Data available from ${silverEarliest} to ${silverLatest}. Use alongside planetary tools to find astrological correlations with Silver price movements. Silver is traditionally associated with Venus and the Moon in Vedic astrology.`,
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        start_date: {
+          type: "string",
+          description: `Start date in YYYY-MM-DD format (earliest available: ${silverEarliest})`,
+        },
+        end_date: {
+          type: "string",
+          description: "End date in YYYY-MM-DD format",
+        },
+        limit: {
+          type: "number",
+          description: "Maximum rows to return (default 500, max 2000).",
+        },
+      },
+      required: ["start_date", "end_date"],
+    },
+  },
   ];
 }
 
@@ -332,6 +369,18 @@ async function executeTool(
         }
         const limit = Math.min((toolInput.limit as number) || 500, 2000);
         const result = getNaturalGasPrices({
+          startDate: toolInput.start_date as string,
+          endDate: toolInput.end_date as string,
+          limit,
+        });
+        return truncateToolResult(JSON.stringify(result));
+      }
+      case "get_silver_prices": {
+        if (!isSilverDataReady()) {
+          return JSON.stringify({ error: "Silver price data not loaded. Upload a CSV via the sidebar 'Import Silver Data' button." });
+        }
+        const limit = Math.min((toolInput.limit as number) || 500, 2000);
+        const result = getSilverPrices({
           startDate: toolInput.start_date as string,
           endDate: toolInput.end_date as string,
           limit,

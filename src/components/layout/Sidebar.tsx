@@ -496,6 +496,7 @@ export default function Sidebar({
         >
           <BtcImportButton />
           <ImportButton label="⬆ Import Nat Gas Data" endpoint="/api/import-ng" title="Import Natural Gas spot price data (.csv or .numbers)" />
+          <ImportButton label="⬆ Import Silver Data" endpoint="/api/import-silver" title="Import Silver futures price data (.csv or .numbers)" />
           <div>Powered by Claude + Vedic Astrology</div>
         </div>
       </div>
