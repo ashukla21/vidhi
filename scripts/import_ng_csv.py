@@ -183,6 +183,8 @@ COLUMN_MAP = {
 def normalise_row(raw: dict) -> dict | None:
     mapped = {}
     for raw_key, value in raw.items():
+        if raw_key is None:
+            continue
         key = COLUMN_MAP.get(raw_key.strip().lower())
         if key:
             mapped[key] = value
