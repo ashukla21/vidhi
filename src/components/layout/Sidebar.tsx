@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { ChatFolder, ChatThread } from "@/types";
 import { formatDateTime } from "@/lib/utils";
 
-function BtcImportButton() {
+function ImportButton({ label, endpoint, title }: { label: string; endpoint: string; title: string }) {
   const [status, setStatus] = useState<"idle" | "uploading" | "done" | "error">("idle");
   const [message, setMessage] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -13,57 +13,46 @@ function BtcImportButton() {
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-
     setStatus("uploading");
     setMessage("Importing…");
-
     const form = new FormData();
     form.append("file", file);
-
     try {
-      const res = await fetch("/api/import-btc", { method: "POST", body: form });
+      const res = await fetch(endpoint, { method: "POST", body: form });
       const data = await res.json();
-
       if (!res.ok) {
         setStatus("error");
-        setMessage(data.error ?? "Import failed");
+        setMessage(data.details || data.error || "Import failed");
       } else {
         setStatus("done");
-        // Pull the summary line out of the script output
+        // Find the "Saved:" summary line, fall back to last non-empty line
         const lines: string[] = (data.output as string).split("\n").filter(Boolean);
-        setMessage(lines[lines.length - 1] ?? "Done");
+        const saved = lines.find(l => l.startsWith("Saved:")) ?? lines[lines.length - 1] ?? "Done";
+        setMessage(saved);
       }
     } catch (err) {
       setStatus("error");
       setMessage(String(err));
     }
-
-    // Reset input so the same file can be re-selected if needed
     if (inputRef.current) inputRef.current.value = "";
   }
 
   const color =
-    status === "done" ? "var(--purple-light)" :
-    status === "error" ? "#f87171" :
+    status === "done"     ? "var(--purple-light)" :
+    status === "error"    ? "#f87171" :
     "var(--text-muted)";
 
   return (
     <div>
-      <input
-        ref={inputRef}
-        type="file"
-        accept=".csv,.numbers,.tsv,.txt"
-        className="hidden"
-        onChange={handleFile}
-      />
+      <input ref={inputRef} type="file" accept=".csv,.numbers,.tsv,.txt" className="hidden" onChange={handleFile} />
       <button
         onClick={() => { setStatus("idle"); setMessage(""); inputRef.current?.click(); }}
         disabled={status === "uploading"}
         className="w-full text-left text-xs transition-all liquid-glass-item px-1 py-1 rounded"
         style={{ color, opacity: status === "uploading" ? 0.6 : 1 }}
-        title="Import BTC historical data (.csv or .numbers)"
+        title={title}
       >
-        {status === "uploading" ? "⏳ Importing…" : "⬆ Import BTC Data"}
+        {status === "uploading" ? "⏳ Importing…" : label}
       </button>
       {message && (
         <div className="text-xs mt-1 px-1 leading-snug" style={{ color }}>
@@ -72,6 +61,10 @@ function BtcImportButton() {
       )}
     </div>
   );
+}
+
+function BtcImportButton() {
+  return <ImportButton label="⬆ Import BTC Data" endpoint="/api/import-btc" title="Import Bitcoin historical data (.csv or .numbers)" />;
 }
 
 interface SidebarProps {
@@ -502,6 +495,7 @@ export default function Sidebar({
           style={{ borderTop: "1px solid var(--border-subtle)", color: "var(--text-muted)" }}
         >
           <BtcImportButton />
+          <ImportButton label="⬆ Import Nat Gas Data" endpoint="/api/import-ng" title="Import Natural Gas spot price data (.csv or .numbers)" />
           <div>Powered by Claude + Vedic Astrology</div>
         </div>
       </div>

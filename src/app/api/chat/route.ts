@@ -8,6 +8,7 @@ import {
   isDataReady,
 } from "@/lib/astro-db";
 import { getBitcoinPrices, isBtcDataReady, getBtcDateRange } from "@/lib/btc-db";
+import { getNaturalGasPrices, isNgDataReady, getNgDateRange } from "@/lib/ng-db";
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -94,6 +95,15 @@ Use this tool to:
 
 To correlate BTC with astrology, call both tools with matching date ranges and then synthesize the results.
 
+## Natural Gas Price Data
+
+${((): string => {
+  const r = getNgDateRange();
+  return r
+    ? `You also have access to Henry Hub Natural Gas spot price data via the **get_natural_gas_prices** tool. Data spans from **${r.earliest}** to **${r.latest}**. Each row contains: date, open, high, low, close (spot price in $/MMBtu), volume, and pct_change.\n\nUse this tool to cross-reference Natural Gas price movements with Vedic planetary transits and identify astrological patterns in energy market cycles.`
+    : `Natural Gas price data is not loaded yet. The user can upload a CSV via the sidebar **"Import Nat Gas Data"** button.`;
+})()}
+
 ## Vedic Astrology Principles for Markets
 
 - Jupiter transits into new signs often correlate with bull markets (especially Sagittarius, Pisces)
@@ -118,11 +128,17 @@ You are NOT a financial advisor.`;
 function buildTools(): Anthropic.Tool[] {
   const btcRange = getBtcDateRange();
   const btcEarliest = btcRange?.earliest ?? "unknown";
-  const btcLatest = btcRange?.latest ?? "present";
-  return buildToolList(btcEarliest, btcLatest);
+  const btcLatest   = btcRange?.latest   ?? "present";
+  const ngRange  = getNgDateRange();
+  const ngEarliest  = ngRange?.earliest  ?? "unknown";
+  const ngLatest    = ngRange?.latest    ?? "present";
+  return buildToolList(btcEarliest, btcLatest, ngEarliest, ngLatest);
 }
 
-function buildToolList(btcEarliest: string, btcLatest: string): Anthropic.Tool[] {
+function buildToolList(
+  btcEarliest: string, btcLatest: string,
+  ngEarliest: string,  ngLatest: string,
+): Anthropic.Tool[] {
   return [
   {
     name: "get_planetary_positions",
@@ -226,6 +242,29 @@ function buildToolList(btcEarliest: string, btcLatest: string): Anthropic.Tool[]
       required: ["start_date", "end_date"],
     },
   },
+  {
+    name: "get_natural_gas_prices",
+    description:
+      `Retrieve historical Henry Hub Natural Gas spot price data. Returns date, open, high, low, close (spot price $/MMBtu), volume, and pct_change. Data available from ${ngEarliest} to ${ngLatest}. Use alongside planetary tools to find astrological correlations with energy market cycles.`,
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        start_date: {
+          type: "string",
+          description: `Start date in YYYY-MM-DD format (earliest available: ${ngEarliest})`,
+        },
+        end_date: {
+          type: "string",
+          description: "End date in YYYY-MM-DD format",
+        },
+        limit: {
+          type: "number",
+          description: "Maximum rows to return (default 500, max 2000).",
+        },
+      },
+      required: ["start_date", "end_date"],
+    },
+  },
   ];
 }
 
@@ -281,6 +320,18 @@ async function executeTool(
         }
         const limit = Math.min((toolInput.limit as number) || 500, 500);
         const result = getBitcoinPrices({
+          startDate: toolInput.start_date as string,
+          endDate: toolInput.end_date as string,
+          limit,
+        });
+        return truncateToolResult(JSON.stringify(result));
+      }
+      case "get_natural_gas_prices": {
+        if (!isNgDataReady()) {
+          return JSON.stringify({ error: "Natural Gas data not loaded. Upload a CSV via the sidebar 'Import Nat Gas Data' button." });
+        }
+        const limit = Math.min((toolInput.limit as number) || 500, 2000);
+        const result = getNaturalGasPrices({
           startDate: toolInput.start_date as string,
           endDate: toolInput.end_date as string,
           limit,
