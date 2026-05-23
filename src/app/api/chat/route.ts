@@ -10,6 +10,7 @@ import {
 import { getBitcoinPrices, isBtcDataReady, getBtcDateRange } from "@/lib/btc-db";
 import { getNaturalGasPrices, isNgDataReady, getNgDateRange } from "@/lib/ng-db";
 import { getSilverPrices, isSilverDataReady, getSilverDateRange } from "@/lib/silver-db";
+import { getGoldPrices, isGoldDataReady, getGoldDateRange } from "@/lib/gold-db";
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -114,6 +115,15 @@ ${((): string => {
     : `Silver price data is not loaded yet. The user can upload a CSV via the sidebar **"Import Silver Data"** button.`;
 })()}
 
+## Gold Price Data
+
+${((): string => {
+  const r = getGoldDateRange();
+  return r
+    ? `You also have access to Gold price data via the **get_gold_prices** tool. Data spans from **${r.earliest}** to **${r.latest}**. Each row contains: date, open, high, low, close (price in USD per troy ounce), volume, and pct_change.\n\nUse this tool to cross-reference Gold price movements with Vedic planetary transits. Gold is associated with the Sun and Jupiter in Vedic astrology — Sun sign changes and Jupiter transits are particularly significant for Gold cycles.`
+    : `Gold price data is not loaded yet. The user can upload a CSV via the sidebar **"Import Gold Data"** button.`;
+})()}
+
 ## Vedic Astrology Principles for Markets
 
 - Jupiter transits into new signs often correlate with bull markets (especially Sagittarius, Pisces)
@@ -145,13 +155,17 @@ function buildTools(): Anthropic.Tool[] {
   const silverRange = getSilverDateRange();
   const silverEarliest = silverRange?.earliest ?? "unknown";
   const silverLatest   = silverRange?.latest   ?? "present";
-  return buildToolList(btcEarliest, btcLatest, ngEarliest, ngLatest, silverEarliest, silverLatest);
+  const goldRange = getGoldDateRange();
+  const goldEarliest = goldRange?.earliest ?? "unknown";
+  const goldLatest   = goldRange?.latest   ?? "present";
+  return buildToolList(btcEarliest, btcLatest, ngEarliest, ngLatest, silverEarliest, silverLatest, goldEarliest, goldLatest);
 }
 
 function buildToolList(
   btcEarliest: string, btcLatest: string,
   ngEarliest: string,  ngLatest: string,
   silverEarliest: string, silverLatest: string,
+  goldEarliest: string,   goldLatest: string,
 ): Anthropic.Tool[] {
   return [
   {
@@ -302,6 +316,29 @@ function buildToolList(
       required: ["start_date", "end_date"],
     },
   },
+  {
+    name: "get_gold_prices",
+    description:
+      `Retrieve historical Gold price data. Returns date, open, high, low, close (USD per troy ounce), volume, and pct_change. Data available from ${goldEarliest} to ${goldLatest}. Use alongside planetary tools to find astrological correlations with Gold price movements. Gold is associated with the Sun and Jupiter in Vedic astrology — Sun sign changes and Jupiter transits are especially significant for Gold cycles.`,
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        start_date: {
+          type: "string",
+          description: `Start date in YYYY-MM-DD format (earliest available: ${goldEarliest})`,
+        },
+        end_date: {
+          type: "string",
+          description: "End date in YYYY-MM-DD format",
+        },
+        limit: {
+          type: "number",
+          description: "Maximum rows to return (default 500, max 2000).",
+        },
+      },
+      required: ["start_date", "end_date"],
+    },
+  },
   ];
 }
 
@@ -381,6 +418,18 @@ async function executeTool(
         }
         const limit = Math.min((toolInput.limit as number) || 500, 2000);
         const result = getSilverPrices({
+          startDate: toolInput.start_date as string,
+          endDate: toolInput.end_date as string,
+          limit,
+        });
+        return truncateToolResult(JSON.stringify(result));
+      }
+      case "get_gold_prices": {
+        if (!isGoldDataReady()) {
+          return JSON.stringify({ error: "Gold price data not loaded. Upload a CSV via the sidebar 'Import Gold Data' button." });
+        }
+        const limit = Math.min((toolInput.limit as number) || 500, 2000);
+        const result = getGoldPrices({
           startDate: toolInput.start_date as string,
           endDate: toolInput.end_date as string,
           limit,
