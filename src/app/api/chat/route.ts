@@ -12,6 +12,7 @@ import { getNaturalGasPrices, isNgDataReady, getNgDateRange } from "@/lib/ng-db"
 import { getSilverPrices, isSilverDataReady, getSilverDateRange } from "@/lib/silver-db";
 import { getGoldPrices, isGoldDataReady, getGoldDateRange } from "@/lib/gold-db";
 import { getCrudePrices, isCrudeDataReady, getCrudeDateRange } from "@/lib/crude-db";
+import { getCopperPrices, isCopperDataReady, getCopperDateRange } from "@/lib/copper-db";
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -134,6 +135,15 @@ ${((): string => {
     : `WTI Crude Oil price data is not loaded yet. The user can upload a CSV via the sidebar **"Import Crude Oil Data"** button.`;
 })()}
 
+## Copper Futures Price Data
+
+${((): string => {
+  const r = getCopperDateRange();
+  return r
+    ? `You also have access to Copper Futures price data via the **get_copper_prices** tool. Data spans from **${r.earliest}** to **${r.latest}**. Each row contains: date, open, high, low, close (price in USD per pound for COMEX, or USD per metric ton for LME), volume, and pct_change.\n\nUse this tool to cross-reference Copper price movements with Vedic planetary transits. Copper is associated with Venus and Mercury in Vedic astrology — Venus and Mercury transits, along with Rahu/Ketu shifts, are significant for industrial metals cycles.`
+    : `Copper Futures price data is not loaded yet. The user can upload a CSV via the sidebar **"Import Copper Data"** button.`;
+})()}
+
 ## Vedic Astrology Principles for Markets
 
 - Jupiter transits into new signs often correlate with bull markets (especially Sagittarius, Pisces)
@@ -171,7 +181,10 @@ function buildTools(): Anthropic.Tool[] {
   const crudeRange = getCrudeDateRange();
   const crudeEarliest = crudeRange?.earliest ?? "unknown";
   const crudeLatest   = crudeRange?.latest   ?? "present";
-  return buildToolList(btcEarliest, btcLatest, ngEarliest, ngLatest, silverEarliest, silverLatest, goldEarliest, goldLatest, crudeEarliest, crudeLatest);
+  const copperRange = getCopperDateRange();
+  const copperEarliest = copperRange?.earliest ?? "unknown";
+  const copperLatest   = copperRange?.latest   ?? "present";
+  return buildToolList(btcEarliest, btcLatest, ngEarliest, ngLatest, silverEarliest, silverLatest, goldEarliest, goldLatest, crudeEarliest, crudeLatest, copperEarliest, copperLatest);
 }
 
 function buildToolList(
@@ -180,6 +193,7 @@ function buildToolList(
   silverEarliest: string, silverLatest: string,
   goldEarliest: string,   goldLatest: string,
   crudeEarliest: string,  crudeLatest: string,
+  copperEarliest: string, copperLatest: string,
 ): Anthropic.Tool[] {
   return [
   {
@@ -376,6 +390,29 @@ function buildToolList(
       required: ["start_date", "end_date"],
     },
   },
+  {
+    name: "get_copper_prices",
+    description:
+      `Retrieve historical Copper Futures price data. Returns date, open, high, low, close (USD per pound on COMEX, or USD per metric ton on LME), volume, and pct_change. Data available from ${copperEarliest} to ${copperLatest}. Use alongside planetary tools to find astrological correlations with Copper price movements. Copper is associated with Venus and Mercury in Vedic astrology — Venus/Mercury transits and Rahu/Ketu shifts are significant for industrial metals cycles.`,
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        start_date: {
+          type: "string",
+          description: `Start date in YYYY-MM-DD format (earliest available: ${copperEarliest})`,
+        },
+        end_date: {
+          type: "string",
+          description: "End date in YYYY-MM-DD format",
+        },
+        limit: {
+          type: "number",
+          description: "Maximum rows to return (default 500, max 2000).",
+        },
+      },
+      required: ["start_date", "end_date"],
+    },
+  },
   ];
 }
 
@@ -479,6 +516,18 @@ async function executeTool(
         }
         const limit = Math.min((toolInput.limit as number) || 500, 2000);
         const result = getCrudePrices({
+          startDate: toolInput.start_date as string,
+          endDate: toolInput.end_date as string,
+          limit,
+        });
+        return truncateToolResult(JSON.stringify(result));
+      }
+      case "get_copper_prices": {
+        if (!isCopperDataReady()) {
+          return JSON.stringify({ error: "Copper price data not loaded. Upload a CSV via the sidebar 'Import Copper Data' button." });
+        }
+        const limit = Math.min((toolInput.limit as number) || 500, 2000);
+        const result = getCopperPrices({
           startDate: toolInput.start_date as string,
           endDate: toolInput.end_date as string,
           limit,
