@@ -498,6 +498,7 @@ export default function Sidebar({
           <ImportButton label="⬆ Import Nat Gas Data" endpoint="/api/import-ng" title="Import Natural Gas spot price data (.csv or .numbers)" />
           <ImportButton label="⬆ Import Silver Data" endpoint="/api/import-silver" title="Import Silver futures price data (.csv or .numbers)" />
           <ImportButton label="⬆ Import Gold Data" endpoint="/api/import-gold" title="Import Gold price data (.csv or .numbers)" />
+          <ImportButton label="⬆ Import Crude Oil Data" endpoint="/api/import-crude" title="Import WTI Crude Oil price data (.csv or .numbers)" />
           <div>Powered by Claude + Vedic Astrology</div>
         </div>
       </div>
