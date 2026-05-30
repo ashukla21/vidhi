@@ -9,40 +9,50 @@ const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 // Targeted at the tabular planet-position view (Jagannatha Hora, Kala, Parashara's Light, AstroSage, etc.)
 // More reliable than reading degrees off the visual chart boxes.
-const PROMPT = `You are reading a Vedic astrology planetary positions TABLE using Lahiri Ayanamsha.
-This is a DATA TABLE — columns contain explicit text values for degrees, sign, nakshatra etc.
-Read each cell value EXACTLY as printed. Do not calculate or estimate — copy the numbers you see.
+const PROMPT = `You are reading a Vedic astrology D1 (natal) planetary positions TABLE using Lahiri Ayanamsha.
+This is a DATA TABLE — each ROW belongs to exactly one planet, each COLUMN holds one field.
+
+═══ ROW DISCIPLINE (CRITICAL) ═══
+Process the table ONE ROW AT A TIME.
+The planet name in the leftmost column is the ROW ANCHOR.
+Every value you record for a planet — degrees, sign, nakshatra, pada, house, RC flag —
+MUST come from that planet's OWN horizontal row.
+NEVER borrow a value from the row above or below, even if the current cell looks empty.
 
 STEP 1 — Identify every planet row. Standardise the planet name to one of:
   Sun, Moon, Mars, Mercury, Jupiter, Venus, Saturn, Rahu, Ketu, Ascendant
   (Lagna / Asc / Lg = Ascendant. Skip any other points like MC, Vertex, etc.)
 
-STEP 2 — For each planet read these fields directly from the table cells:
+STEP 2 — For each planet, read these fields from that planet's own row:
 
-degrees (CRITICAL — read exactly what is printed):
-  • If the column shows D°M'S" format (e.g. "25°18'43"") → convert to decimal: D + M/60 + S/3600, round to 2 dp → 25.31
-  • If the column shows "25:18:43" or "25-18-43" format → same conversion
-  • If the column already shows a decimal like "25.31" → use it as-is
-  • This is degrees WITHIN the sign (always 0.00–29.99)
-  • DO NOT confuse with the absolute longitude (0–360); use only the within-sign portion
+degrees (read exactly what is printed in that row's degree cell):
+  • D°M'S" format (e.g. "25°18'43"") → decimal: D + M/60 + S/3600, round to 2 dp → 25.31
+  • "25:18:43" or "25-18-43" → same conversion
+  • Already decimal "25.31" → use as-is
+  • Always 0.00–29.99 (degrees within the sign, not absolute longitude 0–360)
 
-rashi — read the sign column directly. Map to English if needed:
+rashi — sign column in that row. Map abbreviations to English:
   Ari/Mes=Aries  Tau/Vri=Taurus  Gem/Mit=Gemini  Can/Kar=Cancer
-  Leo/Sin=Leo    Vir/Kan=Virgo   Lib/Tul=Libra   Sco/Vri/Vsc=Scorpio
+  Leo/Sin=Leo    Vir/Kan=Virgo   Lib/Tul=Libra   Sco/Vrc/Vsc=Scorpio
   Sag/Dha=Sagittarius  Cap/Mak=Capricorn  Aqu/Kum=Aquarius  Pis/Min=Pisces
 
-nakshatra — copy the nakshatra name from the table cell exactly (full name preferred):
+nakshatra — copy nakshatra name from that row's nakshatra cell:
   Ashwini, Bharani, Krittika, Rohini, Mrigashira, Ardra, Punarvasu, Pushya, Ashlesha,
   Magha, Purva Phalguni, Uttara Phalguni, Hasta, Chitra, Swati, Vishakha, Anuradha,
   Jyeshtha, Mula, Purva Ashadha, Uttara Ashadha, Shravana, Dhanishtha, Shatabhisha,
   Purva Bhadrapada, Uttara Bhadrapada, Revati
 
-nakshatra_pada — integer 1–4 from the pada/quarter column (null if absent)
-house — integer 1–12 from the house column (null if absent)
-is_retrograde — true if the planet's row/cell shows R, Rx, (R), or "Retro"; false otherwise
-is_combust — true if the planet's row/cell shows C, (C), or "Combust"; false otherwise
-  (Combust = planet is too close to the Sun and its light is obscured)
-  Note: Sun and Moon are never combust; Rahu and Ketu are never retrograde in this system
+nakshatra_pada — integer 1–4 from the pada/quarter column in that row (null if absent)
+house — integer 1–12 from the house column in that row (null if absent)
+
+is_retrograde / is_combust — read ONLY from the RC (or R/C) status column in that row:
+  • RC column shows "R" or "Rx" or "(R)" → is_retrograde: true, is_combust: false
+  • RC column shows "C" or "(C)"          → is_combust: true,    is_retrograde: false
+  • RC column shows "RC" or "R,C"         → both true
+  • RC column is blank or absent          → both false
+  IMPORTANT: "R" appearing in a planet name (Rahu) or nakshatra name (Rohini, Revati)
+  does NOT indicate retrograde — only count R/C in the dedicated RC/status column.
+  Sun and Moon are never combust; Rahu and Ketu are never retrograde.
 
 STEP 3 — Return ONLY this JSON (no markdown, no explanation):
 {
@@ -92,7 +102,7 @@ export async function POST(
 
     const response = await anthropic.messages.create({
       model: "claude-haiku-4-5-20251001",
-      max_tokens: 2048,
+      max_tokens: 4096,
       messages: [{
         role: "user",
         content: [
