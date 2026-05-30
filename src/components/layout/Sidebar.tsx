@@ -117,8 +117,9 @@ function StockRow({ stock, onDelete, onRefresh }: { stock: StockSummary; onDelet
               IPO: {stock.ipo_date}{stock.ipo_time ? ` ${stock.ipo_time} ET` : ""}
             </div>
           )}
-          <StockUploadButton ticker={stock.ticker} label="Birth Chart" endpoint="upload-chart"    done={stock.has_natal_chart} onDone={onRefresh} />
-          <StockUploadButton ticker={stock.ticker} label="Dasha"       endpoint="upload-dasha"    done={stock.has_dasha}       onDone={onRefresh} />
+          <StockUploadButton ticker={stock.ticker} label="Birth Chart"      endpoint="upload-chart"   done={stock.has_natal_chart} onDone={onRefresh} />
+          <StockUploadButton ticker={stock.ticker} label="Planet Positions" endpoint="upload-planets" done={stock.has_natal_chart} onDone={onRefresh} />
+          <StockUploadButton ticker={stock.ticker} label="Dasha"            endpoint="upload-dasha"   done={stock.has_dasha}       onDone={onRefresh} />
           <StockUploadButton ticker={stock.ticker} label="Navamsha"    endpoint="upload-navamsha" done={stock.has_navamsha}    onDone={onRefresh} />
         </div>
       )}
