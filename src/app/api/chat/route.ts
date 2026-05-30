@@ -13,6 +13,10 @@ import { getSilverPrices, isSilverDataReady, getSilverDateRange } from "@/lib/si
 import { getGoldPrices, isGoldDataReady, getGoldDateRange } from "@/lib/gold-db";
 import { getCrudePrices, isCrudeDataReady, getCrudeDateRange } from "@/lib/crude-db";
 import { getCopperPrices, isCopperDataReady, getCopperDateRange } from "@/lib/copper-db";
+import {
+  listStocks, getStock, getNatalPlanets, getDashaPeriods,
+  getCurrentDasha, getUpcomingDashaChanges, getNavamsha,
+} from "@/lib/stock-db";
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -143,6 +147,19 @@ ${((): string => {
     ? `You also have access to Copper Futures price data via the **get_copper_prices** tool. Data spans from **${r.earliest}** to **${r.latest}**. Each row contains: date, open, high, low, close (price in USD per pound for COMEX, or USD per metric ton for LME), volume, and pct_change.\n\nUse this tool to cross-reference Copper price movements with Vedic planetary transits. Copper is associated with Venus and Mercury in Vedic astrology — Venus and Mercury transits, along with Rahu/Ketu shifts, are significant for industrial metals cycles.`
     : `Copper Futures price data is not loaded yet. The user can upload a CSV via the sidebar **"Import Copper Data"** button.`;
 })()}
+
+## Stock Profiles (Vedic Chart Analysis)
+
+You have tools to analyse individual US stocks using their Vedic natal charts. The system uses **Vimshottari Dashas** and **Lahiri Ayanamsha** consistently for all stocks.
+
+Use **list_stock_profiles** to see which stocks have been saved. Use **get_stock_profile** to retrieve a stock's full astrological profile — natal chart, active Vimshottari dasha/antardasha/pratyantardasha, upcoming dasha changes, and Navamsha placements. Use **get_stock_price_history** to fetch real-time historical prices from Yahoo Finance for any US ticker.
+
+When analysing a stock:
+1. Pull the natal chart to identify key planetary strengths and the Ascendant
+2. Check the active dasha/antardasha — the dasha lord's natal condition and current transits drive the primary trend
+3. Cross-reference transiting planets (from get_planetary_positions) over natal planets, especially the natal Moon, Ascendant, and the dasha lord
+4. Use Navamsha placements to assess strength of planets — a debilitated natal planet that is exalted in Navamsha (Neecha Bhanga) can reverse weakness
+5. Correlate actual price data with astrological periods to identify repeating patterns
 
 ## Vedic Astrology Principles for Markets
 
@@ -391,6 +408,40 @@ function buildToolList(
     },
   },
   {
+    name: "list_stock_profiles",
+    description:
+      "List all US stock profiles saved in the system, showing ticker, company name, IPO date/time, and which astrological data is available (natal chart, dasha periods, navamsha). Call this first when the user asks about a stock to confirm its profile exists.",
+    input_schema: { type: "object" as const, properties: {}, required: [] },
+  },
+  {
+    name: "get_stock_profile",
+    description:
+      "Get the complete Vedic astrological profile for a saved US stock. Returns: (1) IPO birth data, (2) natal planetary positions with degrees/rashi/nakshatra/house using Lahiri Ayanamsha, (3) active Vimshottari Mahadasha/Antardasha/Pratyantardasha for the requested date, (4) upcoming dasha changes in the next 12 months, (5) Navamsha (D9) placements. Use alongside get_planetary_positions and get_stock_price_history for full correlation analysis.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        ticker: { type: "string", description: "Stock ticker symbol (e.g. AAPL, MSFT, TSLA)" },
+        date:   { type: "string", description: "Date to compute active dasha for in YYYY-MM-DD (defaults to today)" },
+      },
+      required: ["ticker"],
+    },
+  },
+  {
+    name: "get_stock_price_history",
+    description:
+      "Fetch historical daily OHLCV price data for any US stock ticker from Yahoo Finance. Returns date, open, high, low, close (USD), and volume. Use this to correlate actual price movements with Vedic dasha periods and planetary transits.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        ticker:     { type: "string", description: "Stock ticker symbol (e.g. AAPL, TSLA, NVDA)" },
+        start_date: { type: "string", description: "Start date in YYYY-MM-DD format" },
+        end_date:   { type: "string", description: "End date in YYYY-MM-DD format" },
+        limit:      { type: "number", description: "Maximum rows to return (default 500, max 2000)" },
+      },
+      required: ["ticker", "start_date", "end_date"],
+    },
+  },
+  {
     name: "get_copper_prices",
     description:
       `Retrieve historical Copper Futures price data. Returns date, open, high, low, close (USD per pound on COMEX, or USD per metric ton on LME), volume, and pct_change. Data available from ${copperEarliest} to ${copperLatest}. Use alongside planetary tools to find astrological correlations with Copper price movements. Copper is associated with Venus and Mercury in Vedic astrology — Venus/Mercury transits and Rahu/Ketu shifts are significant for industrial metals cycles.`,
@@ -521,6 +572,90 @@ async function executeTool(
           limit,
         });
         return truncateToolResult(JSON.stringify(result));
+      }
+      case "list_stock_profiles": {
+        const stocks = listStocks();
+        if (stocks.length === 0) return JSON.stringify({ message: "No stock profiles saved yet. Add a stock via the sidebar Stocks section." });
+        return JSON.stringify(stocks.map(s => ({
+          ticker: s.ticker,
+          company: s.company_name,
+          ipo_date: s.ipo_date,
+          ipo_time: s.ipo_time,
+          ipo_timezone: s.ipo_timezone,
+          has_natal_chart: s.has_natal_chart,
+          has_dasha: s.has_dasha,
+          has_navamsha: s.has_navamsha,
+        })));
+      }
+      case "get_stock_profile": {
+        const ticker = (toolInput.ticker as string).toUpperCase();
+        const stock = getStock(ticker);
+        if (!stock) return JSON.stringify({ error: `No profile found for ${ticker}. Add it via the sidebar Stocks section.` });
+
+        const now = new Date();
+        const TZ = "America/Chicago";
+        const date = (toolInput.date as string | undefined) ?? [
+          now.toLocaleDateString("en-US", { year: "numeric", timeZone: TZ }),
+          now.toLocaleDateString("en-US", { month: "2-digit", timeZone: TZ }),
+          now.toLocaleDateString("en-US", { day: "2-digit", timeZone: TZ }),
+        ].join("-");
+
+        const result = {
+          ticker,
+          company_name: stock.company_name,
+          ipo_date: stock.ipo_date,
+          ipo_time: stock.ipo_time,
+          ipo_timezone: stock.ipo_timezone,
+          ayanamsha: "Lahiri",
+          dasha_system: "Vimshottari",
+          natal_chart: stock.has_natal_chart
+            ? { has_data: true, planets: getNatalPlanets(ticker) }
+            : { has_data: false, message: "Upload birth chart screenshot via sidebar" },
+          active_dasha: stock.has_dasha
+            ? { as_of: date, ...getCurrentDasha(ticker, date) }
+            : { has_data: false, message: "Upload dasha screenshot via sidebar" },
+          upcoming_dasha_changes: stock.has_dasha
+            ? getUpcomingDashaChanges(ticker, date, 12)
+            : [],
+          navamsha: stock.has_navamsha
+            ? { has_data: true, planets: getNavamsha(ticker) }
+            : { has_data: false, message: "Upload Navamsha screenshot via sidebar" },
+        };
+        return truncateToolResult(JSON.stringify(result));
+      }
+      case "get_stock_price_history": {
+        const ticker  = (toolInput.ticker as string).toUpperCase();
+        const start   = toolInput.start_date as string;
+        const end     = toolInput.end_date as string;
+        const limit   = Math.min((toolInput.limit as number) || 500, 2000);
+        const period1 = Math.floor(new Date(start).getTime() / 1000);
+        const period2 = Math.floor(new Date(end).getTime() / 1000);
+        try {
+          const res = await fetch(
+            `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&period1=${period1}&period2=${period2}`,
+            { headers: { "User-Agent": "Mozilla/5.0", "Accept": "application/json" } }
+          );
+          if (!res.ok) return JSON.stringify({ error: `Yahoo Finance returned HTTP ${res.status} for ${ticker}` });
+          const data = await res.json() as {
+            chart: { result?: { timestamp: number[]; indicators: { quote: { open: number[]; high: number[]; low: number[]; close: number[]; volume: number[] }[] } }[] };
+          };
+          const r = data?.chart?.result?.[0];
+          if (!r) return JSON.stringify({ error: `No price data found for ${ticker}` });
+          const { timestamp: ts, indicators: { quote: [q] } } = r;
+          const rows = ts.slice(0, limit)
+            .map((t, i) => ({
+              date:   new Date(t * 1000).toISOString().slice(0, 10),
+              open:   q.open[i]  != null ? Math.round(q.open[i]  * 100) / 100 : null,
+              high:   q.high[i]  != null ? Math.round(q.high[i]  * 100) / 100 : null,
+              low:    q.low[i]   != null ? Math.round(q.low[i]   * 100) / 100 : null,
+              close:  q.close[i] != null ? Math.round(q.close[i] * 100) / 100 : null,
+              volume: q.volume[i] ?? null,
+            }))
+            .filter(row => row.close != null);
+          return truncateToolResult(JSON.stringify(rows));
+        } catch (e) {
+          return JSON.stringify({ error: `Failed to fetch prices for ${ticker}: ${String(e)}` });
+        }
       }
       case "get_copper_prices": {
         if (!isCopperDataReady()) {

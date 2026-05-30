@@ -1,9 +1,243 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { ChatFolder, ChatThread } from "@/types";
 import { formatDateTime } from "@/lib/utils";
+
+// ── Stock profile types (mirrored from stock-db to avoid server import) ────────
+interface StockSummary {
+  ticker: string;
+  company_name: string | null;
+  ipo_date: string | null;
+  ipo_time: string | null;
+  has_natal_chart: boolean;
+  has_dasha: boolean;
+  has_navamsha: boolean;
+}
+
+// ── Per-stock upload button ────────────────────────────────────────────────────
+function StockUploadButton({
+  ticker,
+  label,
+  endpoint,
+  done,
+  onDone,
+}: {
+  ticker: string;
+  label: string;
+  endpoint: string;
+  done: boolean;
+  onDone: () => void;
+}) {
+  const [status, setStatus] = useState<"idle" | "uploading" | "done" | "error">("idle");
+  const [msg, setMsg]       = useState("");
+  const ref = useRef<HTMLInputElement>(null);
+
+  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setStatus("uploading");
+    setMsg("");
+    const form = new FormData();
+    form.append("file", file);
+    try {
+      const res  = await fetch(`/api/stocks/${ticker}/${endpoint}`, { method: "POST", body: form });
+      const data = await res.json();
+      if (!res.ok) {
+        setStatus("error");
+        setMsg(data.error || "Upload failed");
+      } else {
+        setStatus("done");
+        setMsg(data.saved ? `Saved ${data.saved} periods` : `${data.planets_saved ?? ""} planets saved`);
+        onDone();
+      }
+    } catch (err) {
+      setStatus("error");
+      setMsg(String(err));
+    }
+    if (ref.current) ref.current.value = "";
+  }
+
+  const color =
+    status === "done"  || done ? "var(--purple-light)" :
+    status === "error"         ? "#f87171" :
+    "var(--text-muted)";
+
+  return (
+    <div className="flex flex-col">
+      <input ref={ref} type="file" accept=".png,.jpg,.jpeg,.webp,.gif" className="hidden" onChange={handleFile} />
+      <button
+        onClick={() => { setStatus("idle"); ref.current?.click(); }}
+        disabled={status === "uploading"}
+        className="text-left text-xs transition-all liquid-glass-item px-1 py-0.5 rounded"
+        style={{ color, opacity: status === "uploading" ? 0.6 : 1 }}
+        title={`Upload ${label} screenshot`}
+      >
+        {status === "uploading" ? "⏳" : (done && status === "idle") ? "✓" : "⬆"} {label}
+      </button>
+      {msg && <div className="text-xs px-1 leading-snug" style={{ color }}>{msg}</div>}
+    </div>
+  );
+}
+
+// ── Single stock row ───────────────────────────────────────────────────────────
+function StockRow({ stock, onDelete, onRefresh }: { stock: StockSummary; onDelete: () => void; onRefresh: () => void }) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div className="rounded-lg overflow-hidden" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+      <div
+        className="flex items-center justify-between px-2 py-1.5 cursor-pointer"
+        onClick={() => setExpanded(v => !v)}
+      >
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="text-xs" style={{ color: "var(--text-muted)" }}>{expanded ? "▾" : "▸"}</span>
+          <span className="text-xs font-semibold" style={{ color: "var(--purple-light)" }}>{stock.ticker}</span>
+          {stock.company_name && (
+            <span className="text-xs truncate" style={{ color: "var(--text-muted)" }}>{stock.company_name}</span>
+          )}
+        </div>
+        <div className="flex items-center gap-1 shrink-0 text-xs" style={{ color: "var(--text-muted)" }}>
+          {stock.has_natal_chart && <span title="Birth chart loaded">📊</span>}
+          {stock.has_dasha        && <span title="Dasha loaded">📅</span>}
+          {stock.has_navamsha     && <span title="Navamsha loaded">🔮</span>}
+          <button
+            onClick={(e) => { e.stopPropagation(); onDelete(); }}
+            className="ml-1 p-0.5 rounded hover:text-red-400 transition-colors"
+            title="Delete stock"
+          >✕</button>
+        </div>
+      </div>
+
+      {expanded && (
+        <div className="px-2 pb-2 space-y-1" style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+          {stock.ipo_date && (
+            <div className="text-xs pt-1" style={{ color: "var(--text-muted)" }}>
+              IPO: {stock.ipo_date}{stock.ipo_time ? ` ${stock.ipo_time} ET` : ""}
+            </div>
+          )}
+          <StockUploadButton ticker={stock.ticker} label="Birth Chart" endpoint="upload-chart"    done={stock.has_natal_chart} onDone={onRefresh} />
+          <StockUploadButton ticker={stock.ticker} label="Dasha"       endpoint="upload-dasha"    done={stock.has_dasha}       onDone={onRefresh} />
+          <StockUploadButton ticker={stock.ticker} label="Navamsha"    endpoint="upload-navamsha" done={stock.has_navamsha}    onDone={onRefresh} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Add-stock inline form ──────────────────────────────────────────────────────
+function AddStockForm({ onAdded }: { onAdded: () => void }) {
+  const [open,    setOpen]    = useState(false);
+  const [ticker,  setTicker]  = useState("");
+  const [company, setCompany] = useState("");
+  const [date,    setDate]    = useState("");
+  const [time,    setTime]    = useState("");
+  const [saving,  setSaving]  = useState(false);
+  const [err,     setErr]     = useState("");
+
+  async function submit() {
+    if (!ticker.trim()) { setErr("Ticker required"); return; }
+    setSaving(true); setErr("");
+    try {
+      const res = await fetch("/api/stocks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ticker: ticker.trim().toUpperCase(), company_name: company || null, ipo_date: date || null, ipo_time: time || null }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setErr(data.error || "Failed"); }
+      else { setTicker(""); setCompany(""); setDate(""); setTime(""); setOpen(false); onAdded(); }
+    } catch (e) { setErr(String(e)); }
+    setSaving(false);
+  }
+
+  if (!open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        className="w-full text-left text-xs px-2 py-1 rounded transition-all liquid-glass-item"
+        style={{ color: "var(--text-muted)" }}
+      >+ Add Stock</button>
+    );
+  }
+
+  const inputStyle: React.CSSProperties = {
+    background: "rgba(255,255,255,0.06)",
+    border: "1px solid rgba(255,255,255,0.1)",
+    borderRadius: 6,
+    color: "var(--text-primary)",
+    padding: "3px 6px",
+    fontSize: 11,
+    width: "100%",
+    outline: "none",
+  };
+
+  return (
+    <div className="space-y-1 p-2 rounded-lg" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+      <input style={inputStyle} placeholder="Ticker (e.g. AAPL)" value={ticker} onChange={e => setTicker(e.target.value.toUpperCase())} />
+      <input style={inputStyle} placeholder="Company name (optional)" value={company} onChange={e => setCompany(e.target.value)} />
+      <input style={inputStyle} type="date" value={date} onChange={e => setDate(e.target.value)} title="IPO date" />
+      <input style={inputStyle} type="time" value={time} onChange={e => setTime(e.target.value)} title="IPO time (ET)" />
+      {err && <div className="text-xs" style={{ color: "#f87171" }}>{err}</div>}
+      <div className="flex gap-1 pt-0.5">
+        <button
+          onClick={submit} disabled={saving}
+          className="flex-1 text-xs py-1 rounded transition-all liquid-glass-btn"
+          style={{ color: "white", opacity: saving ? 0.6 : 1 }}
+        >{saving ? "Saving…" : "Add"}</button>
+        <button
+          onClick={() => { setOpen(false); setErr(""); }}
+          className="text-xs px-2 py-1 rounded transition-all liquid-glass-item"
+          style={{ color: "var(--text-muted)" }}
+        >Cancel</button>
+      </div>
+    </div>
+  );
+}
+
+// ── Stocks section (collapsible) ───────────────────────────────────────────────
+function StocksSection() {
+  const [open,   setOpen]   = useState(true);
+  const [stocks, setStocks] = useState<StockSummary[]>([]);
+
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch("/api/stocks");
+      if (res.ok) setStocks(await res.json());
+    } catch { /* ignore */ }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function handleDelete(ticker: string) {
+    await fetch(`/api/stocks/${ticker}`, { method: "DELETE" });
+    load();
+  }
+
+  return (
+    <div className="px-3 pt-2 pb-1 shrink-0">
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="w-full flex items-center gap-1 text-xs font-medium mb-1 px-1 py-0.5 rounded transition-all liquid-glass-item"
+        style={{ color: "var(--text-secondary)" }}
+      >
+        <span>📈</span>
+        <span className="flex-1 text-left">Stocks</span>
+        <span style={{ opacity: 0.5 }}>{open ? "▾" : "▸"}</span>
+      </button>
+
+      {open && (
+        <div className="space-y-1">
+          {stocks.map(s => (
+            <StockRow key={s.ticker} stock={s} onDelete={() => handleDelete(s.ticker)} onRefresh={load} />
+          ))}
+          <AddStockForm onAdded={load} />
+        </div>
+      )}
+    </div>
+  );
+}
 
 function ImportButton({ label, endpoint, title }: { label: string; endpoint: string; title: string }) {
   const [status, setStatus] = useState<"idle" | "uploading" | "done" | "error">("idle");
@@ -366,6 +600,9 @@ export default function Sidebar({
             <span>New Chat</span>
           </button>
         </div>
+
+        {/* Stocks section */}
+        <StocksSection />
 
         {/* Scrollable thread/folder list */}
         <div className="flex-1 overflow-y-auto px-3 py-2 space-y-1">
