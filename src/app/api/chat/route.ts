@@ -605,7 +605,7 @@ async function executeTool(
           company_name: stock.company_name,
           ipo_date: stock.ipo_date,
           ipo_time: stock.ipo_time,
-          ipo_timezone: stock.ipo_timezone,
+          ipo_location: `${stock.ipo_city}, ${stock.ipo_state}, ${stock.ipo_country}`,
           ayanamsha: "Lahiri",
           dasha_system: "Vimshottari",
           natal_chart: stock.has_natal_chart

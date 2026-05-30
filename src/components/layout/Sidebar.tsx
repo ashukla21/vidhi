@@ -112,9 +112,14 @@ function StockRow({ stock, onDelete, onRefresh }: { stock: StockSummary; onDelet
 
       {expanded && (
         <div className="px-2 pb-2 space-y-1" style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
-          {stock.ipo_date && (
-            <div className="text-xs pt-1" style={{ color: "var(--text-muted)" }}>
-              IPO: {stock.ipo_date}{stock.ipo_time ? ` ${stock.ipo_time} ET` : ""}
+          {(stock.ipo_date || stock.ipo_city) && (
+            <div className="text-xs pt-1 space-y-0.5" style={{ color: "var(--text-muted)" }}>
+              {stock.ipo_date && (
+                <div>IPO: {stock.ipo_date}{stock.ipo_time ? ` ${stock.ipo_time}` : ""}</div>
+              )}
+              {stock.ipo_city && (
+                <div>{stock.ipo_city}, {stock.ipo_state}, {stock.ipo_country}</div>
+              )}
             </div>
           )}
           <StockUploadButton ticker={stock.ticker} label="Birth Chart"      endpoint="upload-chart"   done={stock.has_natal_chart} onDone={onRefresh} />
@@ -134,6 +139,9 @@ function AddStockForm({ onAdded }: { onAdded: () => void }) {
   const [company, setCompany] = useState("");
   const [date,    setDate]    = useState("");
   const [time,    setTime]    = useState("");
+  const [city,    setCity]    = useState("New York");
+  const [state,   setState]   = useState("NY");
+  const [country, setCountry] = useState("USA");
   const [saving,  setSaving]  = useState(false);
   const [err,     setErr]     = useState("");
 
@@ -144,11 +152,23 @@ function AddStockForm({ onAdded }: { onAdded: () => void }) {
       const res = await fetch("/api/stocks", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ticker: ticker.trim().toUpperCase(), company_name: company || null, ipo_date: date || null, ipo_time: time || null }),
+        body: JSON.stringify({
+          ticker:       ticker.trim().toUpperCase(),
+          company_name: company.trim() || null,
+          ipo_date:     date.trim()    || null,
+          ipo_time:     time.trim()    || null,
+          ipo_city:     city.trim()    || "New York",
+          ipo_state:    state.trim()   || "NY",
+          ipo_country:  country.trim() || "USA",
+        }),
       });
       const data = await res.json();
       if (!res.ok) { setErr(data.error || "Failed"); }
-      else { setTicker(""); setCompany(""); setDate(""); setTime(""); setOpen(false); onAdded(); }
+      else {
+        setTicker(""); setCompany(""); setDate(""); setTime("");
+        setCity("New York"); setState("NY"); setCountry("USA");
+        setOpen(false); onAdded();
+      }
     } catch (e) { setErr(String(e)); }
     setSaving(false);
   }
@@ -178,8 +198,13 @@ function AddStockForm({ onAdded }: { onAdded: () => void }) {
     <div className="space-y-1 p-2 rounded-lg" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
       <input style={inputStyle} placeholder="Ticker (e.g. AAPL)" value={ticker} onChange={e => setTicker(e.target.value.toUpperCase())} />
       <input style={inputStyle} placeholder="Company name (optional)" value={company} onChange={e => setCompany(e.target.value)} />
-      <input style={inputStyle} type="date" value={date} onChange={e => setDate(e.target.value)} title="IPO date" />
-      <input style={inputStyle} type="time" value={time} onChange={e => setTime(e.target.value)} title="IPO time (ET)" />
+      <input style={inputStyle} type="date" placeholder="IPO date" value={date} onChange={e => setDate(e.target.value)} />
+      <input style={inputStyle} type="text" placeholder="IPO time (e.g. 09:30)" value={time} onChange={e => setTime(e.target.value)} />
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 60px 60px", gap: 4 }}>
+        <input style={inputStyle} placeholder="City" value={city}    onChange={e => setCity(e.target.value)} />
+        <input style={inputStyle} placeholder="State" value={state}   onChange={e => setState(e.target.value)} />
+        <input style={inputStyle} placeholder="Country" value={country} onChange={e => setCountry(e.target.value)} />
+      </div>
       {err && <div className="text-xs" style={{ color: "#f87171" }}>{err}</div>}
       <div className="flex gap-1 pt-0.5">
         <button

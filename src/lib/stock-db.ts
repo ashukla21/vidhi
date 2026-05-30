@@ -28,6 +28,9 @@ function ensureSchema(conn: SQLiteDB): void {
       ipo_date     TEXT,
       ipo_time     TEXT,
       ipo_timezone TEXT NOT NULL DEFAULT 'America/New_York',
+      ipo_city     TEXT NOT NULL DEFAULT 'New York',
+      ipo_state    TEXT NOT NULL DEFAULT 'NY',
+      ipo_country  TEXT NOT NULL DEFAULT 'USA',
       created_at   TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
@@ -63,6 +66,15 @@ function ensureSchema(conn: SQLiteDB): void {
       UNIQUE(ticker, planet)
     );
   `);
+
+  // Safe migrations for existing DBs — ALTER TABLE ADD COLUMN is a no-op if column exists (caught below)
+  for (const [col, def] of [
+    ["ipo_city",    "TEXT NOT NULL DEFAULT 'New York'"],
+    ["ipo_state",   "TEXT NOT NULL DEFAULT 'NY'"],
+    ["ipo_country", "TEXT NOT NULL DEFAULT 'USA'"],
+  ] as [string, string][]) {
+    try { conn.exec(`ALTER TABLE stocks ADD COLUMN ${col} ${def}`); } catch { /* already exists */ }
+  }
 }
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -73,6 +85,9 @@ export interface Stock {
   ipo_date: string | null;
   ipo_time: string | null;
   ipo_timezone: string;
+  ipo_city: string;
+  ipo_state: string;
+  ipo_country: string;
   created_at: string;
   has_natal_chart: boolean;
   has_dasha: boolean;
@@ -142,21 +157,30 @@ export function createStock(params: {
   ipo_date?: string | null;
   ipo_time?: string | null;
   ipo_timezone?: string;
+  ipo_city?: string | null;
+  ipo_state?: string | null;
+  ipo_country?: string | null;
 }): void {
   getDb().prepare(`
-    INSERT INTO stocks (ticker, company_name, ipo_date, ipo_time, ipo_timezone)
-    VALUES (?, ?, ?, ?, ?)
+    INSERT INTO stocks (ticker, company_name, ipo_date, ipo_time, ipo_timezone, ipo_city, ipo_state, ipo_country)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(ticker) DO UPDATE SET
       company_name = excluded.company_name,
       ipo_date     = excluded.ipo_date,
       ipo_time     = excluded.ipo_time,
-      ipo_timezone = excluded.ipo_timezone
+      ipo_timezone = excluded.ipo_timezone,
+      ipo_city     = excluded.ipo_city,
+      ipo_state    = excluded.ipo_state,
+      ipo_country  = excluded.ipo_country
   `).run(
     params.ticker.toUpperCase(),
     params.company_name ?? null,
     params.ipo_date ?? null,
-    params.ipo_time ?? null,
+    params.ipo_time?.trim() || null,
     params.ipo_timezone ?? "America/New_York",
+    params.ipo_city?.trim()    || "New York",
+    params.ipo_state?.trim()   || "NY",
+    params.ipo_country?.trim() || "USA",
   );
 }
 

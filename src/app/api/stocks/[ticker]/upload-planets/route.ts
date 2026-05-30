@@ -8,27 +8,46 @@ export const dynamic = "force-dynamic";
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 // Targeted at the tabular planet-position view (Jagannatha Hora, Kala, Parashara's Light, AstroSage, etc.)
-// This is more reliable than parsing degrees from the visual chart boxes.
-const PROMPT = `You are reading a Vedic astrology planetary positions table (Lahiri Ayanamsha). This is a tabular data view — NOT a chart diagram — so degrees and signs are written explicitly as numbers and text.
+// More reliable than reading degrees off the visual chart boxes.
+const PROMPT = `You are reading a Vedic astrology planetary positions TABLE using Lahiri Ayanamsha.
+This is a DATA TABLE — columns contain explicit text values for degrees, sign, nakshatra etc.
+Read each cell value EXACTLY as printed. Do not calculate or estimate — copy the numbers you see.
 
-Extract every row. For each planet or point listed:
-- planet: standardise to one of: Sun, Moon, Mars, Mercury, Jupiter, Venus, Saturn, Rahu, Ketu, Ascendant
-  (Lagna = Ascendant; MC/Midheaven = skip; other points = skip)
-- degrees: decimal degrees WITHIN the sign (0–30). If shown as D°M'S" convert: degrees + minutes/60 + seconds/3600. Round to 2 decimal places.
-- rashi: English zodiac sign name — exactly one of:
-  Aries, Taurus, Gemini, Cancer, Leo, Virgo, Libra, Scorpio, Sagittarius, Capricorn, Aquarius, Pisces
-  (Accept Sanskrit/abbreviated equivalents: Mes=Aries, Vri=Taurus, Mit=Gemini, Kar=Cancer, Sin=Leo, Kan=Virgo, Tul=Libra, Vri/Vsc=Scorpio, Dha=Sagittarius, Mak=Capricorn, Kum=Aquarius, Min=Pisces)
-- nakshatra: nakshatra name exactly as shown (e.g. Ashwini, Bharani, Krittika, Rohini, Mrigashira, Ardra, Punarvasu, Pushya, Ashlesha, Magha, Purva Phalguni, Uttara Phalguni, Hasta, Chitra, Swati, Vishakha, Anuradha, Jyeshtha, Mula, Purva Ashadha, Uttara Ashadha, Shravana, Dhanishtha, Shatabhisha, Purva Bhadrapada, Uttara Bhadrapada, Revati)
-- nakshatra_pada: pada 1–4 as integer (null if not shown)
-- house: house number 1–12 as integer (null if not shown in this table)
-- is_retrograde: true if marked R, Rx, (R), or retrograde — otherwise false
+STEP 1 — Identify every planet row. Standardise the planet name to one of:
+  Sun, Moon, Mars, Mercury, Jupiter, Venus, Saturn, Rahu, Ketu, Ascendant
+  (Lagna / Asc / Lg = Ascendant. Skip any other points like MC, Vertex, etc.)
 
-Return ONLY valid JSON, no other text:
+STEP 2 — For each planet read these fields directly from the table cells:
+
+degrees (CRITICAL — read exactly what is printed):
+  • If the column shows D°M'S" format (e.g. "25°18'43"") → convert to decimal: D + M/60 + S/3600, round to 2 dp → 25.31
+  • If the column shows "25:18:43" or "25-18-43" format → same conversion
+  • If the column already shows a decimal like "25.31" → use it as-is
+  • This is degrees WITHIN the sign (always 0.00–29.99)
+  • DO NOT confuse with the absolute longitude (0–360); use only the within-sign portion
+
+rashi — read the sign column directly. Map to English if needed:
+  Ari/Mes=Aries  Tau/Vri=Taurus  Gem/Mit=Gemini  Can/Kar=Cancer
+  Leo/Sin=Leo    Vir/Kan=Virgo   Lib/Tul=Libra   Sco/Vri/Vsc=Scorpio
+  Sag/Dha=Sagittarius  Cap/Mak=Capricorn  Aqu/Kum=Aquarius  Pis/Min=Pisces
+
+nakshatra — copy the nakshatra name from the table cell exactly (full name preferred):
+  Ashwini, Bharani, Krittika, Rohini, Mrigashira, Ardra, Punarvasu, Pushya, Ashlesha,
+  Magha, Purva Phalguni, Uttara Phalguni, Hasta, Chitra, Swati, Vishakha, Anuradha,
+  Jyeshtha, Mula, Purva Ashadha, Uttara Ashadha, Shravana, Dhanishtha, Shatabhisha,
+  Purva Bhadrapada, Uttara Bhadrapada, Revati
+
+nakshatra_pada — integer 1–4 from the pada/quarter column (null if absent)
+house — integer 1–12 from the house column (null if absent)
+is_retrograde — true if the row shows R, Rx, (R), or "Retro"; false otherwise
+
+STEP 3 — Return ONLY this JSON (no markdown, no explanation):
 {
   "planets": [
-    {"planet": "Sun",       "degrees": 25.30, "rashi": "Scorpio",  "nakshatra": "Jyeshtha",  "nakshatra_pada": 2, "house": 2,  "is_retrograde": false},
-    {"planet": "Moon",      "degrees":  8.14, "rashi": "Taurus",   "nakshatra": "Krittika",  "nakshatra_pada": 3, "house": 8,  "is_retrograde": false},
-    {"planet": "Ascendant", "degrees": 10.22, "rashi": "Libra",    "nakshatra": "Swati",     "nakshatra_pada": 1, "house": 1,  "is_retrograde": false},
+    {"planet": "Sun",       "degrees": 25.31, "rashi": "Scorpio",    "nakshatra": "Jyeshtha",       "nakshatra_pada": 2, "house": 2, "is_retrograde": false},
+    {"planet": "Moon",      "degrees":  8.24, "rashi": "Taurus",     "nakshatra": "Krittika",       "nakshatra_pada": 3, "house": 8, "is_retrograde": false},
+    {"planet": "Ascendant", "degrees": 10.22, "rashi": "Libra",      "nakshatra": "Swati",          "nakshatra_pada": 1, "house": 1, "is_retrograde": false},
+    {"planet": "Saturn",    "degrees": 14.07, "rashi": "Capricorn",  "nakshatra": "Shravana",       "nakshatra_pada": 2, "house": 4, "is_retrograde": true},
     ...
   ]
 }`;
