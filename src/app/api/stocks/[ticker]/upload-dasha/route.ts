@@ -7,29 +7,44 @@ export const dynamic = "force-dynamic";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-const PROMPT = `You are parsing a Vimshottari Dasha table from a Vedic astrology software screenshot. The system uses Vimshottari Dashas with Lahiri Ayanamsha.
+const PROMPT = `You are parsing a Vimshottari Dasha table from a Vedic astrology software screenshot (Lahiri Ayanamsha).
 
-Extract ALL dasha periods visible in this image. For each row:
-- mahadasha_lord: Mahadasha planet name
-- antardasha_lord: Antardasha/Bhukti planet name — null if this row represents only the Mahadasha level
-- pratyantardasha_lord: Pratyantardasha/Sub-sub period planet — null if not at this level
-- start_date: start date in YYYY-MM-DD format
+CRITICAL RULES — read carefully before extracting:
 
-Rules:
-- Include rows at ALL hierarchy levels shown (Mahadasha, Antardasha, Pratyantardasha)
-- Planet names must be exactly: Sun, Moon, Mars, Mercury, Jupiter, Venus, Saturn, Rahu, Ketu
-- Sort all periods by start_date ascending
-- The end date of each period equals the start date of the next period at the same level
+1. HIERARCHY: Every Mahadasha has Antardashas inside it; every Antardasha may have Pratyantar Dashas inside it.
+   The Mahadasha lord is the OUTER period. The Antardasha lord is the INNER period. Never swap them.
+   Example: "Jupiter/Rahu" means Jupiter = Mahadasha, Rahu = Antardasha.
 
-Return ONLY valid JSON, no other text:
+2. ALWAYS emit a Mahadasha-level row (antardasha_lord=null, pratyantardasha_lord=null) for EVERY Mahadasha that appears.
+   Use the date shown on the Mahadasha header line. If no separate header date is shown, use the start date of its first Antardasha.
+
+3. For each row output:
+   - mahadasha_lord: the OUTER / top-level planet
+   - antardasha_lord: the middle planet — null for a Mahadasha-level row
+   - pratyantardasha_lord: the innermost planet — null unless a 3rd level is shown
+   - start_date: YYYY-MM-DD
+
+4. Planet names must be exactly one of: Sun, Moon, Mars, Mercury, Jupiter, Venus, Saturn, Rahu, Ketu
+
+5. Include ALL levels visible. Sort by start_date ascending within each level.
+
+6. CONSISTENCY CHECK before outputting: every antardasha row must have a matching mahadasha row with the same lord and an equal or earlier start_date. If one is missing, add it using the first antardasha's start_date.
+
+Example of correct output for a table showing Rahu MD then Jupiter MD:
 {
   "periods": [
-    {"mahadasha_lord": "Saturn", "antardasha_lord": null, "pratyantardasha_lord": null, "start_date": "2019-12-28"},
-    {"mahadasha_lord": "Saturn", "antardasha_lord": "Saturn", "pratyantardasha_lord": null, "start_date": "2019-12-28"},
-    {"mahadasha_lord": "Saturn", "antardasha_lord": "Saturn", "pratyantardasha_lord": "Saturn", "start_date": "2019-12-28"},
+    {"mahadasha_lord": "Rahu",    "antardasha_lord": null,      "pratyantardasha_lord": null,    "start_date": "2006-03-15"},
+    {"mahadasha_lord": "Rahu",    "antardasha_lord": "Rahu",    "pratyantardasha_lord": null,    "start_date": "2006-03-15"},
+    {"mahadasha_lord": "Rahu",    "antardasha_lord": "Jupiter", "pratyantardasha_lord": null,    "start_date": "2008-10-03"},
+    {"mahadasha_lord": "Rahu",    "antardasha_lord": "Saturn",  "pratyantardasha_lord": null,    "start_date": "2011-06-21"},
+    {"mahadasha_lord": "Jupiter", "antardasha_lord": null,      "pratyantardasha_lord": null,    "start_date": "2024-03-15"},
+    {"mahadasha_lord": "Jupiter", "antardasha_lord": "Jupiter", "pratyantardasha_lord": null,    "start_date": "2024-03-15"},
+    {"mahadasha_lord": "Jupiter", "antardasha_lord": "Jupiter", "pratyantardasha_lord": "Saturn","start_date": "2024-07-20"},
     ...
   ]
-}`;
+}
+
+Return ONLY valid JSON — no markdown fences, no explanation.`;
 
 function extractJSON(text: string): unknown {
   try { return JSON.parse(text); } catch { /* fall through */ }
@@ -98,6 +113,7 @@ export async function POST(
       saved: periods.length,
       breakdown: { mahadasha: mdCount, antardasha: adCount, pratyantardasha: pdCount },
       date_range: { from: periods[0]?.start_date, to: periods[periods.length - 1]?.start_date },
+      periods,
     });
   } catch (err) {
     return Response.json({ error: String(err) }, { status: 500 });

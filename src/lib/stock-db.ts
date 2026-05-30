@@ -221,6 +221,10 @@ export function getNatalPlanets(ticker: string): NatalPlanet[] {
 
 // ── Dasha periods ──────────────────────────────────────────────────────────────
 
+export function clearDashaPeriods(ticker: string): number {
+  return (getDb().prepare("DELETE FROM stock_dasha_periods WHERE ticker = ?").run(ticker) as { changes: number }).changes;
+}
+
 export function saveDashaPeriods(ticker: string, periods: DashaPeriod[]): void {
   const conn = getDb();
   conn.prepare("DELETE FROM stock_dasha_periods WHERE ticker = ?").run(ticker);
