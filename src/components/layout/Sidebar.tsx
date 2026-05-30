@@ -124,7 +124,7 @@ function StockRow({ stock, onDelete, onRefresh }: { stock: StockSummary; onDelet
           )}
           <StockUploadButton ticker={stock.ticker} label="D1 Chart Planet Positions" endpoint="upload-planets" done={stock.has_natal_chart} onDone={onRefresh} />
           <StockUploadButton ticker={stock.ticker} label="Dasha"            endpoint="upload-dasha"   done={stock.has_dasha}       onDone={onRefresh} />
-          <StockUploadButton ticker={stock.ticker} label="Navamsha"    endpoint="upload-navamsha" done={stock.has_navamsha}    onDone={onRefresh} />
+          <StockUploadButton ticker={stock.ticker} label="D9 Chart Planet Positions" endpoint="upload-navamsha-planets" done={stock.has_navamsha} onDone={onRefresh} />
         </div>
       )}
     </div>

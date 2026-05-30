@@ -59,12 +59,17 @@ function ensureSchema(conn: SQLiteDB): void {
     CREATE INDEX IF NOT EXISTS idx_dasha_ticker_date
       ON stock_dasha_periods(ticker, start_date);
 
-    CREATE TABLE IF NOT EXISTS stock_navamsha (
-      id     INTEGER PRIMARY KEY AUTOINCREMENT,
-      ticker TEXT NOT NULL REFERENCES stocks(ticker) ON DELETE CASCADE,
-      planet TEXT NOT NULL,
-      rashi  TEXT,
-      house  INTEGER,
+    CREATE TABLE IF NOT EXISTS stock_navamsha_planets (
+      id             INTEGER PRIMARY KEY AUTOINCREMENT,
+      ticker         TEXT NOT NULL REFERENCES stocks(ticker) ON DELETE CASCADE,
+      planet         TEXT NOT NULL,
+      degrees        REAL,
+      rashi          TEXT,
+      nakshatra      TEXT,
+      nakshatra_pada INTEGER,
+      house          INTEGER,
+      is_retrograde  INTEGER NOT NULL DEFAULT 0,
+      is_combust     INTEGER NOT NULL DEFAULT 0,
       UNIQUE(ticker, planet)
     );
   `);
@@ -74,8 +79,10 @@ function ensureSchema(conn: SQLiteDB): void {
     ["stocks",             "ipo_city",      "TEXT NOT NULL DEFAULT 'New York'"],
     ["stocks",             "ipo_state",     "TEXT NOT NULL DEFAULT 'NY'"],
     ["stocks",             "ipo_country",   "TEXT NOT NULL DEFAULT 'USA'"],
-    ["stock_natal_planets","is_retrograde", "INTEGER NOT NULL DEFAULT 0"],
-    ["stock_natal_planets","is_combust",    "INTEGER NOT NULL DEFAULT 0"],
+    ["stock_natal_planets",    "is_retrograde", "INTEGER NOT NULL DEFAULT 0"],
+    ["stock_natal_planets",    "is_combust",    "INTEGER NOT NULL DEFAULT 0"],
+    ["stock_navamsha_planets", "is_retrograde", "INTEGER NOT NULL DEFAULT 0"],
+    ["stock_navamsha_planets", "is_combust",    "INTEGER NOT NULL DEFAULT 0"],
   ] as [string, string, string][]) {
     try { conn.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${def}`); } catch { /* already exists */ }
   }
@@ -116,12 +123,6 @@ export interface DashaPeriod {
   start_date: string;
 }
 
-export interface NavamshaPlacement {
-  planet: string;
-  rashi: string | null;
-  house: number | null;
-}
-
 // ── Stocks CRUD ────────────────────────────────────────────────────────────────
 
 export function listStocks(): Stock[] {
@@ -129,7 +130,7 @@ export function listStocks(): Stock[] {
     SELECT s.*,
       (SELECT COUNT(*) FROM stock_natal_planets WHERE ticker = s.ticker) > 0 AS has_natal_chart,
       (SELECT COUNT(*) FROM stock_dasha_periods   WHERE ticker = s.ticker) > 0 AS has_dasha,
-      (SELECT COUNT(*) FROM stock_navamsha        WHERE ticker = s.ticker) > 0 AS has_navamsha
+      (SELECT COUNT(*) FROM stock_navamsha_planets WHERE ticker = s.ticker) > 0 AS has_navamsha
     FROM stocks s ORDER BY s.created_at DESC
   `).all() as (Stock & { has_natal_chart: number; has_dasha: number; has_navamsha: number })[];
   return rows.map(r => ({
@@ -145,7 +146,7 @@ export function getStock(ticker: string): Stock | null {
     SELECT s.*,
       (SELECT COUNT(*) FROM stock_natal_planets WHERE ticker = s.ticker) > 0 AS has_natal_chart,
       (SELECT COUNT(*) FROM stock_dasha_periods   WHERE ticker = s.ticker) > 0 AS has_dasha,
-      (SELECT COUNT(*) FROM stock_navamsha        WHERE ticker = s.ticker) > 0 AS has_navamsha
+      (SELECT COUNT(*) FROM stock_navamsha_planets WHERE ticker = s.ticker) > 0 AS has_navamsha
     FROM stocks s WHERE s.ticker = ?
   `).get(ticker) as (Stock & { has_natal_chart: number; has_dasha: number; has_navamsha: number }) | undefined;
   if (!row) return null;
@@ -284,17 +285,26 @@ export function getUpcomingDashaChanges(ticker: string, fromDate: string, months
   `).all(ticker, fromDate, to.toISOString().slice(0, 10)) as DashaPeriod[];
 }
 
-// ── Navamsha ───────────────────────────────────────────────────────────────────
+// ── Navamsha (D9) planets ──────────────────────────────────────────────────────
 
-export function saveNavamsha(ticker: string, planets: NavamshaPlacement[]): void {
+export function saveNavamshaPlants(ticker: string, planets: NatalPlanet[]): void {
   const conn = getDb();
-  conn.prepare("DELETE FROM stock_navamsha WHERE ticker = ?").run(ticker);
-  const ins = conn.prepare("INSERT OR REPLACE INTO stock_navamsha (ticker, planet, rashi, house) VALUES (?, ?, ?, ?)");
-  conn.transaction(() => { for (const p of planets) ins.run(ticker, p.planet, p.rashi, p.house); })();
+  conn.prepare("DELETE FROM stock_navamsha_planets WHERE ticker = ?").run(ticker);
+  const ins = conn.prepare(`
+    INSERT OR REPLACE INTO stock_navamsha_planets
+      (ticker, planet, degrees, rashi, nakshatra, nakshatra_pada, house, is_retrograde, is_combust)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  conn.transaction(() => {
+    for (const p of planets)
+      ins.run(ticker, p.planet, p.degrees, p.rashi, p.nakshatra, p.nakshatra_pada, p.house,
+        p.is_retrograde ? 1 : 0, p.is_combust ? 1 : 0);
+  })();
 }
 
-export function getNavamsha(ticker: string): NavamshaPlacement[] {
-  return getDb().prepare(
-    "SELECT planet, rashi, house FROM stock_navamsha WHERE ticker = ? ORDER BY house"
-  ).all(ticker) as NavamshaPlacement[];
+export function getNavamshaPlants(ticker: string): NatalPlanet[] {
+  const rows = getDb().prepare(
+    "SELECT planet, degrees, rashi, nakshatra, nakshatra_pada, house, is_retrograde, is_combust FROM stock_navamsha_planets WHERE ticker = ? ORDER BY house, degrees"
+  ).all(ticker) as (Omit<NatalPlanet, "is_retrograde" | "is_combust"> & { is_retrograde: number; is_combust: number })[];
+  return rows.map(r => ({ ...r, is_retrograde: Boolean(r.is_retrograde), is_combust: Boolean(r.is_combust) }));
 }

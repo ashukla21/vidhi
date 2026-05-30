@@ -15,7 +15,7 @@ import { getCrudePrices, isCrudeDataReady, getCrudeDateRange } from "@/lib/crude
 import { getCopperPrices, isCopperDataReady, getCopperDateRange } from "@/lib/copper-db";
 import {
   listStocks, getStock, getNatalPlanets, getDashaPeriods,
-  getCurrentDasha, getUpcomingDashaChanges, getNavamsha,
+  getCurrentDasha, getUpcomingDashaChanges, getNavamshaPlants,
 } from "@/lib/stock-db";
 
 const anthropic = new Anthropic({
@@ -617,9 +617,9 @@ async function executeTool(
           upcoming_dasha_changes: stock.has_dasha
             ? getUpcomingDashaChanges(ticker, date, 12)
             : [],
-          navamsha: stock.has_navamsha
-            ? { has_data: true, planets: getNavamsha(ticker) }
-            : { has_data: false, message: "Upload Navamsha screenshot via sidebar" },
+          navamsha_d9: stock.has_navamsha
+            ? { has_data: true, planets: getNavamshaPlants(ticker) }
+            : { has_data: false, message: "Upload D9 Chart Planet Positions screenshot via sidebar" },
         };
         return truncateToolResult(JSON.stringify(result));
       }
