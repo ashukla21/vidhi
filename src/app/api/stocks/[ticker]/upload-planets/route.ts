@@ -39,15 +39,19 @@ nakshatra — copy the nakshatra name from the table cell exactly (full name pre
 
 nakshatra_pada — integer 1–4 from the pada/quarter column (null if absent)
 house — integer 1–12 from the house column (null if absent)
-is_retrograde — true if the row shows R, Rx, (R), or "Retro"; false otherwise
+is_retrograde — true if the planet's row/cell shows R, Rx, (R), or "Retro"; false otherwise
+is_combust — true if the planet's row/cell shows C, (C), or "Combust"; false otherwise
+  (Combust = planet is too close to the Sun and its light is obscured)
+  Note: Sun and Moon are never combust; Rahu and Ketu are never retrograde in this system
 
 STEP 3 — Return ONLY this JSON (no markdown, no explanation):
 {
   "planets": [
-    {"planet": "Sun",       "degrees": 25.31, "rashi": "Scorpio",    "nakshatra": "Jyeshtha",       "nakshatra_pada": 2, "house": 2, "is_retrograde": false},
-    {"planet": "Moon",      "degrees":  8.24, "rashi": "Taurus",     "nakshatra": "Krittika",       "nakshatra_pada": 3, "house": 8, "is_retrograde": false},
-    {"planet": "Ascendant", "degrees": 10.22, "rashi": "Libra",      "nakshatra": "Swati",          "nakshatra_pada": 1, "house": 1, "is_retrograde": false},
-    {"planet": "Saturn",    "degrees": 14.07, "rashi": "Capricorn",  "nakshatra": "Shravana",       "nakshatra_pada": 2, "house": 4, "is_retrograde": true},
+    {"planet": "Sun",       "degrees": 25.31, "rashi": "Scorpio",   "nakshatra": "Jyeshtha",  "nakshatra_pada": 2, "house": 2, "is_retrograde": false, "is_combust": false},
+    {"planet": "Moon",      "degrees":  8.24, "rashi": "Taurus",    "nakshatra": "Krittika",  "nakshatra_pada": 3, "house": 8, "is_retrograde": false, "is_combust": false},
+    {"planet": "Ascendant", "degrees": 10.22, "rashi": "Libra",     "nakshatra": "Swati",     "nakshatra_pada": 1, "house": 1, "is_retrograde": false, "is_combust": false},
+    {"planet": "Saturn",    "degrees": 14.07, "rashi": "Capricorn", "nakshatra": "Shravana",  "nakshatra_pada": 2, "house": 4, "is_retrograde": true,  "is_combust": false},
+    {"planet": "Mercury",   "degrees":  2.55, "rashi": "Scorpio",   "nakshatra": "Vishakha",  "nakshatra_pada": 4, "house": 2, "is_retrograde": false, "is_combust": true},
     ...
   ]
 }`;
@@ -99,7 +103,7 @@ export async function POST(
     });
 
     const rawText = response.content.find(b => b.type === "text")?.text ?? "";
-    const parsed  = extractJSON(rawText) as { planets: (NatalPlanet & { is_retrograde?: boolean })[] };
+    const parsed  = extractJSON(rawText) as { planets: NatalPlanet[] };
 
     if (!Array.isArray(parsed?.planets) || parsed.planets.length === 0) {
       return Response.json(
@@ -108,17 +112,22 @@ export async function POST(
       );
     }
 
-    // Strip is_retrograde before saving (not in the DB schema yet — kept for display)
-    const forDb: NatalPlanet[] = parsed.planets.map(({ is_retrograde: _r, ...rest }) => rest);
-    saveNatalPlanets(upper, forDb);
+    // Ensure boolean fields default to false if absent
+    const planets: NatalPlanet[] = parsed.planets.map(p => ({
+      ...p,
+      is_retrograde: Boolean(p.is_retrograde),
+      is_combust:    Boolean(p.is_combust),
+    }));
+    saveNatalPlanets(upper, planets);
 
     return Response.json({
       success: true,
       ticker: upper,
-      planets_saved: parsed.planets.length,
-      planets: parsed.planets.map(p =>
-        `${p.planet}${(p as { is_retrograde?: boolean }).is_retrograde ? "(R)" : ""} ${p.degrees}° ${p.rashi} — ${p.nakshatra}${p.nakshatra_pada ? ` pada ${p.nakshatra_pada}` : ""}`
-      ),
+      planets_saved: planets.length,
+      planets: planets.map(p => {
+        const flags = [p.is_retrograde ? "R" : "", p.is_combust ? "C" : ""].filter(Boolean).join(",");
+        return `${p.planet}${flags ? `(${flags})` : ""} ${p.degrees}° ${p.rashi} — ${p.nakshatra}${p.nakshatra_pada ? ` pada ${p.nakshatra_pada}` : ""}`;
+      }),
     });
   } catch (err) {
     return Response.json({ error: String(err) }, { status: 500 });

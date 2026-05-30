@@ -43,6 +43,8 @@ function ensureSchema(conn: SQLiteDB): void {
       nakshatra      TEXT,
       nakshatra_pada INTEGER,
       house          INTEGER,
+      is_retrograde  INTEGER NOT NULL DEFAULT 0,
+      is_combust     INTEGER NOT NULL DEFAULT 0,
       UNIQUE(ticker, planet)
     );
 
@@ -67,13 +69,15 @@ function ensureSchema(conn: SQLiteDB): void {
     );
   `);
 
-  // Safe migrations for existing DBs — ALTER TABLE ADD COLUMN is a no-op if column exists (caught below)
-  for (const [col, def] of [
-    ["ipo_city",    "TEXT NOT NULL DEFAULT 'New York'"],
-    ["ipo_state",   "TEXT NOT NULL DEFAULT 'NY'"],
-    ["ipo_country", "TEXT NOT NULL DEFAULT 'USA'"],
-  ] as [string, string][]) {
-    try { conn.exec(`ALTER TABLE stocks ADD COLUMN ${col} ${def}`); } catch { /* already exists */ }
+  // Safe migrations for existing DBs — ALTER TABLE ADD COLUMN fails silently if column exists
+  for (const [table, col, def] of [
+    ["stocks",             "ipo_city",      "TEXT NOT NULL DEFAULT 'New York'"],
+    ["stocks",             "ipo_state",     "TEXT NOT NULL DEFAULT 'NY'"],
+    ["stocks",             "ipo_country",   "TEXT NOT NULL DEFAULT 'USA'"],
+    ["stock_natal_planets","is_retrograde", "INTEGER NOT NULL DEFAULT 0"],
+    ["stock_natal_planets","is_combust",    "INTEGER NOT NULL DEFAULT 0"],
+  ] as [string, string, string][]) {
+    try { conn.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${def}`); } catch { /* already exists */ }
   }
 }
 
@@ -101,6 +105,8 @@ export interface NatalPlanet {
   nakshatra: string | null;
   nakshatra_pada: number | null;
   house: number | null;
+  is_retrograde: boolean;
+  is_combust: boolean;
 }
 
 export interface DashaPeriod {
@@ -195,16 +201,21 @@ export function saveNatalPlanets(ticker: string, planets: NatalPlanet[]): void {
   conn.prepare("DELETE FROM stock_natal_planets WHERE ticker = ?").run(ticker);
   const ins = conn.prepare(`
     INSERT OR REPLACE INTO stock_natal_planets
-      (ticker, planet, degrees, rashi, nakshatra, nakshatra_pada, house)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
+      (ticker, planet, degrees, rashi, nakshatra, nakshatra_pada, house, is_retrograde, is_combust)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
-  conn.transaction(() => { for (const p of planets) ins.run(ticker, p.planet, p.degrees, p.rashi, p.nakshatra, p.nakshatra_pada, p.house); })();
+  conn.transaction(() => {
+    for (const p of planets)
+      ins.run(ticker, p.planet, p.degrees, p.rashi, p.nakshatra, p.nakshatra_pada, p.house,
+        p.is_retrograde ? 1 : 0, p.is_combust ? 1 : 0);
+  })();
 }
 
 export function getNatalPlanets(ticker: string): NatalPlanet[] {
-  return getDb().prepare(
-    "SELECT planet, degrees, rashi, nakshatra, nakshatra_pada, house FROM stock_natal_planets WHERE ticker = ? ORDER BY house, degrees"
-  ).all(ticker) as NatalPlanet[];
+  const rows = getDb().prepare(
+    "SELECT planet, degrees, rashi, nakshatra, nakshatra_pada, house, is_retrograde, is_combust FROM stock_natal_planets WHERE ticker = ? ORDER BY house, degrees"
+  ).all(ticker) as (Omit<NatalPlanet, "is_retrograde" | "is_combust"> & { is_retrograde: number; is_combust: number })[];
+  return rows.map(r => ({ ...r, is_retrograde: Boolean(r.is_retrograde), is_combust: Boolean(r.is_combust) }));
 }
 
 // ── Dasha periods ──────────────────────────────────────────────────────────────
