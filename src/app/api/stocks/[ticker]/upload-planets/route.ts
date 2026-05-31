@@ -7,61 +7,70 @@ export const dynamic = "force-dynamic";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-// Targeted at the tabular planet-position view (Jagannatha Hora, Kala, Parashara's Light, AstroSage, etc.)
-// More reliable than reading degrees off the visual chart boxes.
 const PROMPT = `You are reading a Vedic astrology D1 (natal) planetary positions TABLE using Lahiri Ayanamsha.
-This is a DATA TABLE — each ROW belongs to exactly one planet, each COLUMN holds one field.
+Each ROW belongs to exactly one planet. Each COLUMN holds one field.
 
 ═══ ROW DISCIPLINE (CRITICAL) ═══
-Process the table ONE ROW AT A TIME.
-The planet name in the leftmost column is the ROW ANCHOR.
-Every value you record for a planet — degrees, sign, nakshatra, pada, house, RC flag —
-MUST come from that planet's OWN horizontal row.
-NEVER borrow a value from the row above or below, even if the current cell looks empty.
+Process ONE ROW AT A TIME, top to bottom.
+The planet name in the leftmost column is the ROW ANCHOR for that row.
+Every field you output for that planet (degrees, sign, nakshatra, pada, RC) MUST come
+from that planet's OWN horizontal row — never from the row above or below.
+If a cell appears empty, output null for that field; do NOT copy a value from another row.
 
-STEP 1 — Identify every planet row. Standardise the planet name to one of:
+STEP 1 — Identify every planet row.
+
+The table has one row per body. You MUST include Ascendant (also labelled Lagna / Asc / Asc. / Lg).
+Standardise each name to exactly one of:
   Sun, Moon, Mars, Mercury, Jupiter, Venus, Saturn, Rahu, Ketu, Ascendant
-  (Lagna / Asc / Lg = Ascendant. Skip any other points like MC, Vertex, etc.)
 
-STEP 2 — For each planet, read these fields from that planet's own row:
+Some software prefixes planet names with a Unicode astrological symbol (e.g. ♀ Venus, ♂ Mars, ☿ Mercury).
+Output ONLY the plain text name — strip any leading/trailing symbols or whitespace before outputting.
 
-degrees (read exactly what is printed in that row's degree cell):
-  • D°M'S" format (e.g. "25°18'43"") → decimal: D + M/60 + S/3600, round to 2 dp → 25.31
-  • "25:18:43" or "25-18-43" → same conversion
-  • Already decimal "25.31" → use as-is
-  • Always 0.00–29.99 (degrees within the sign, not absolute longitude 0–360)
+Skip rows that are not one of these 10 bodies (e.g. MC, Vertex, Part of Fortune, column headers).
 
-rashi — sign column in that row. Map abbreviations to English:
-  Ari/Mes=Aries  Tau/Vri=Taurus  Gem/Mit=Gemini  Can/Kar=Cancer
-  Leo/Sin=Leo    Vir/Kan=Virgo   Lib/Tul=Libra   Sco/Vrc/Vsc=Scorpio
+STEP 2 — For each planet read these fields from that planet's own row:
+
+degrees:
+  • D°M'S" or D:M:S or D-M-S format → decimal = D + M/60 + S/3600, round to 2 dp
+  • Already decimal → use as-is
+  • Always 0.00–29.99 (within-sign degrees only, NOT absolute longitude 0–360)
+
+rashi — sign cell in that row. Map abbreviations:
+  Ari/Mes=Aries   Tau/Vri=Taurus   Gem/Mit=Gemini   Can/Kar=Cancer
+  Leo/Sin=Leo     Vir/Kan=Virgo    Lib/Tul=Libra    Sco/Vrc/Vsc=Scorpio
   Sag/Dha=Sagittarius  Cap/Mak=Capricorn  Aqu/Kum=Aquarius  Pis/Min=Pisces
 
-nakshatra — copy nakshatra name from that row's nakshatra cell:
+nakshatra — copy the nakshatra name from that row's nakshatra cell (full name preferred):
   Ashwini, Bharani, Krittika, Rohini, Mrigashira, Ardra, Punarvasu, Pushya, Ashlesha,
   Magha, Purva Phalguni, Uttara Phalguni, Hasta, Chitra, Swati, Vishakha, Anuradha,
   Jyeshtha, Mula, Purva Ashadha, Uttara Ashadha, Shravana, Dhanishtha, Shatabhisha,
   Purva Bhadrapada, Uttara Bhadrapada, Revati
 
-nakshatra_pada — integer 1–4 from the pada/quarter column in that row (null if absent)
-house — integer 1–12 from the house column in that row (null if absent)
+nakshatra_pada — integer 1–4 from that row's pada/quarter cell (null if absent)
 
-is_retrograde / is_combust — read ONLY from the RC (or R/C) status column in that row:
-  • RC column shows "R" or "Rx" or "(R)" → is_retrograde: true, is_combust: false
-  • RC column shows "C" or "(C)"          → is_combust: true,    is_retrograde: false
-  • RC column shows "RC" or "R,C"         → both true
-  • RC column is blank or absent          → both false
-  IMPORTANT: "R" appearing in a planet name (Rahu) or nakshatra name (Rohini, Revati)
-  does NOT indicate retrograde — only count R/C in the dedicated RC/status column.
-  Sun and Moon are never combust; Rahu and Ketu are never retrograde.
+RC STATUS — read ONLY the RC (or R/C or Status) column cell for this planet's row.
+Do NOT read the column header; read only the data cell that sits in this planet's row.
+Apply exactly one of these four rules based solely on what that cell contains:
+  Rule 1: cell = "R" or "Rx" or "(R)"    → is_retrograde=true,  is_combust=false
+  Rule 2: cell = "C" or "(C)"            → is_retrograde=false, is_combust=true
+  Rule 3: cell contains both R and C     → is_retrograde=true,  is_combust=true
+  Rule 4: cell is blank, "-", or absent  → is_retrograde=false, is_combust=false
 
-STEP 3 — Return ONLY this JSON (no markdown, no explanation):
+  ⚠ "C" alone → is_combust=true, is_retrograde=false. "C" does NOT set retrograde.
+  ⚠ "R" alone → is_retrograde=true, is_combust=false. "R" does NOT set combust.
+  ⚠ "R" in a planet name (Rahu) or nakshatra (Rohini, Revati, Ardra) is NOT retrograde.
+  ⚠ Sun and Moon are never combust. Rahu and Ketu are never retrograde.
+
+STEP 3 — Return ONLY valid JSON, no markdown fences, no explanation:
 {
   "planets": [
-    {"planet": "Sun",       "degrees": 25.31, "rashi": "Scorpio",   "nakshatra": "Jyeshtha",  "nakshatra_pada": 2, "house": 2, "is_retrograde": false, "is_combust": false},
-    {"planet": "Moon",      "degrees":  8.24, "rashi": "Taurus",    "nakshatra": "Krittika",  "nakshatra_pada": 3, "house": 8, "is_retrograde": false, "is_combust": false},
-    {"planet": "Ascendant", "degrees": 10.22, "rashi": "Libra",     "nakshatra": "Swati",     "nakshatra_pada": 1, "house": 1, "is_retrograde": false, "is_combust": false},
-    {"planet": "Saturn",    "degrees": 14.07, "rashi": "Capricorn", "nakshatra": "Shravana",  "nakshatra_pada": 2, "house": 4, "is_retrograde": true,  "is_combust": false},
-    {"planet": "Mercury",   "degrees":  2.55, "rashi": "Scorpio",   "nakshatra": "Vishakha",  "nakshatra_pada": 4, "house": 2, "is_retrograde": false, "is_combust": true},
+    {"planet": "Sun",       "degrees": 25.31, "rashi": "Scorpio",    "nakshatra": "Jyeshtha",       "nakshatra_pada": 2, "is_retrograde": false, "is_combust": false},
+    {"planet": "Moon",      "degrees":  8.24, "rashi": "Taurus",     "nakshatra": "Krittika",        "nakshatra_pada": 3, "is_retrograde": false, "is_combust": false},
+    {"planet": "Ascendant", "degrees": 10.22, "rashi": "Libra",      "nakshatra": "Swati",           "nakshatra_pada": 1, "is_retrograde": false, "is_combust": false},
+    {"planet": "Saturn",    "degrees": 14.07, "rashi": "Capricorn",  "nakshatra": "Shravana",        "nakshatra_pada": 2, "is_retrograde": true,  "is_combust": false},
+    {"planet": "Mercury",   "degrees":  2.55, "rashi": "Scorpio",    "nakshatra": "Vishakha",        "nakshatra_pada": 4, "is_retrograde": false, "is_combust": true},
+    {"planet": "Venus",     "degrees": 18.40, "rashi": "Sagittarius","nakshatra": "Purva Ashadha",   "nakshatra_pada": 1, "is_retrograde": false, "is_combust": false},
+    {"planet": "Rahu",      "degrees":  5.12, "rashi": "Aries",      "nakshatra": "Ashwini",         "nakshatra_pada": 2, "is_retrograde": false, "is_combust": false},
     ...
   ]
 }`;
@@ -79,6 +88,11 @@ function mediaType(filename: string): "image/jpeg" | "image/png" | "image/webp" 
   if (ext === "webp") return "image/webp";
   if (ext === "gif") return "image/gif";
   return "image/png";
+}
+
+// Strip Unicode astrological glyphs (☉☽♂☿♃♀♄☊☋ and similar) from planet names
+function cleanPlanetName(raw: string): string {
+  return raw.replace(/[☀-⛿♀♂♃♄♅♆♇♈-♓]/gu, "").trim();
 }
 
 export async function POST(
@@ -122,9 +136,10 @@ export async function POST(
       );
     }
 
-    // Ensure boolean fields default to false if absent
     const planets: NatalPlanet[] = parsed.planets.map(p => ({
       ...p,
+      planet:        cleanPlanetName(String(p.planet)),
+      house:         null,   // not extracted — table doesn't show house
       is_retrograde: Boolean(p.is_retrograde),
       is_combust:    Boolean(p.is_combust),
     }));
