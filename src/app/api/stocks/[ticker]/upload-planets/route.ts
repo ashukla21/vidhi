@@ -50,15 +50,24 @@ nakshatra_pada — integer 1–4 from that row's pada/quarter cell (null if abse
 
 RC STATUS — read ONLY the RC (or R/C or Status) column cell for this planet's row.
 Do NOT read the column header; read only the data cell that sits in this planet's row.
-Apply exactly one of these four rules based solely on what that cell contains:
-  Rule 1: cell = "R" or "Rx" or "(R)"    → is_retrograde=true,  is_combust=false
-  Rule 2: cell = "C" or "(C)"            → is_retrograde=false, is_combust=true
-  Rule 3: cell contains both R and C     → is_retrograde=true,  is_combust=true
-  Rule 4: cell is blank, "-", or absent  → is_retrograde=false, is_combust=false
+Matching is CASE-INSENSITIVE (R, r, C, c are treated the same).
+Check the cell for the presence of R and C independently, then apply all three rules:
 
-  ⚠ "C" alone → is_combust=true, is_retrograde=false. "C" does NOT set retrograde.
-  ⚠ "R" alone → is_retrograde=true, is_combust=false. "R" does NOT set combust.
-  ⚠ "R" in a planet name (Rahu) or nakshatra (Rohini, Revati, Ardra) is NOT retrograde.
+  Does the cell contain the letter R (or Rx)? → is_retrograde = true, else false
+  Does the cell contain the letter C?          → is_combust    = true, else false
+
+  Examples:
+    "R"  or "Rx"         → is_retrograde=true,  is_combust=false
+    "C"                  → is_retrograde=false, is_combust=true
+    "RC" or "Rc" or "rC" → is_retrograde=true,  is_combust=true
+    blank, "-", "."      → is_retrograde=false, is_combust=false
+
+ALWAYS output both is_retrograde and is_combust for every planet row.
+Never omit either field. Use false (not null) when the status is not set.
+
+  ⚠ "C" alone = COMBUST ONLY. "C" never sets is_retrograde.
+  ⚠ "R" alone = RETROGRADE ONLY. "R" never sets is_combust.
+  ⚠ The letter R inside a planet name (Rahu) or nakshatra (Rohini, Revati) is NOT retrograde.
   ⚠ Sun and Moon are never combust. Rahu and Ketu are never retrograde.
 
 STEP 3 — Return ONLY valid JSON, no markdown fences, no explanation:
@@ -139,9 +148,9 @@ export async function POST(
     const planets: NatalPlanet[] = parsed.planets.map(p => ({
       ...p,
       planet:        cleanPlanetName(String(p.planet)),
-      house:         null,   // not extracted — table doesn't show house
-      is_retrograde: Boolean(p.is_retrograde),
-      is_combust:    Boolean(p.is_combust),
+      house:         null,       // not extracted — table doesn't show house
+      is_retrograde: p.is_retrograde === true,   // null/undefined/false → false
+      is_combust:    p.is_combust === true,       // null/undefined/false → false
     }));
     saveNatalPlanets(upper, planets);
 
